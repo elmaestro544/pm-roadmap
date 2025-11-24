@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PM Roadmap | AI-Powered Project & Construction Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+        body {
+            background-color: #0D0C13;
+            color: #f8fafc;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1E1B2E;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #2DD4BF; /* brand-purple -> new turquoise */
+            border-radius: 10px;
+            border: 2px solid #1E1B2E;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: #5EEAD4; /* brand-purple-light -> new light turquoise */
+        }
+        option {
+            color: #f8fafc;
+            background-color: #1E1B2E;
+        }
+
+        /* Gradient border utility */
+        .glow-border {
+            position: relative;
+            z-index: 1;
+        }
+        .glow-border::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            padding: 1px;
+            border-radius: inherit; /* Use parent's border-radius */
+            background: linear-gradient(145deg, rgba(45, 212, 191, 0.4), rgba(45, 212, 191, 0.1), rgba(45, 212, 191, 0.4));
+            -webkit-mask: 
+                linear-gradient(#fff 0 0) content-box, 
+                linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+            z-index: -1;
+        }
+        .sidebar-glow::before {
+             content: "";
+             position: absolute;
+             top: 0;
+             left: 0;
+             bottom: 0;
+             width: 2px;
+             background: linear-gradient(to bottom, #5EEAD4, #A3E635, #FACC15);
+             box-shadow: 0 0 10px #5EEAD4, 0 0 20px #A3E635;
+             opacity: 0.6;
+        }
+
+
+        /* Animations */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        @keyframes pulse {
+            50% {
+                opacity: .5;
+            }
+        }
+        .animate-pulse-fast {
+            animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes slide-in-up {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-slide-in-up {
+            animation: slide-in-up 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+        }
+        @keyframes fade-in-up {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-fade-in-up {
+            animation: fade-in-up 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+        }
+
+        /* Cityscape Animation */
+        @keyframes grow-building {
+            from {
+                transform: scaleY(0);
+                opacity: 0;
+            }
+            to {
+                transform: scaleY(1);
+                opacity: 1;
+            }
+        }
+        .building {
+            transform-origin: bottom;
+            animation: grow-building 1.5s cubic-bezier(0.645, 0.045, 0.355, 1.000) forwards;
+        }
+        @keyframes crane-arm-swing {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(45deg); }
+        }
+        .crane-arm {
+            transform-origin: 2.5px 2.5px;
+            animation: crane-arm-swing 15s ease-in-out infinite;
+        }
+        @keyframes light-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.2; }
+        }
+        .blinking-light {
+            animation: light-blink 2s infinite;
+        }
+
+        /* Print-specific styles */
+        @media print {
+            @page {
+                size: auto;
+                margin: 0mm;
+            }
+
+            html, body, #root, main {
+                height: auto !important;
+                min-height: 0 !important;
+                width: 100% !important;
+                overflow: visible !important;
+                position: static !important;
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                display: block !important;
+            }
+
+            /* Reset Flexbox and Grid Layouts that confine height */
+            .flex, .h-screen, .min-h-screen, .h-full, .flex-1, .flex-grow, .overflow-hidden, .overflow-y-auto, .overflow-auto {
+                height: auto !important;
+                min-height: 0 !important;
+                flex: none !important;
+                overflow: visible !important;
+                display: block !important;
+            }
+
+            /* Hide non-printable elements */
+            header, aside, .non-printable, footer, .sidebar-glow {
+                display: none !important;
+            }
+
+            /* Printable container specific overrides */
+            .printable-container {
+                height: auto !important;
+                width: 100% !important;
+                overflow: visible !important;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 20px !important;
+                margin: 0 !important;
+                position: static !important;
+                display: block !important;
+                background-color: white !important;
+            }
+
+            .printable-content {
+                transform: none !important; /* Reset zoom */
+                width: 100% !important;
+                height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: visible !important;
+                display: block !important;
+            }
+
+            /* Content Styling for Print */
+            .printable-content * {
+                color: #000 !important;
+                text-shadow: none !important;
+                background-color: transparent !important;
+                box-shadow: none !important;
+            }
+            
+            /* Borders */
+            .border, .border-b, .border-t, .border-l, .border-r {
+                border-color: #e5e7eb !important; /* gray-200 */
+            }
+
+            /* Page Breaks */
+            .break-before-page {
+                page-break-before: always !important;
+                break-before: page !important;
+            }
+            .break-inside-avoid {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+
+            /* Hide scrollbars */
+            ::-webkit-scrollbar {
+                display: none;
+            }
+        }
+    </style>
+    <script>
+      tailwind.config = {
+        darkMode: 'class', // Using class for consistency, but theme is dark by default.
+        theme: {
+          fontFamily: {
+            sans: ['Poppins', 'Arial', 'sans-serif'],
+          },
+          extend: {
+            colors: {
+              'brand-purple': '#2DD4BF', // turquoise
+              'brand-purple-light': '#5EEAD4', // light turquoise
+              'brand-pink': '#A3E635', // green
+              'brand-cyan': '#FACC15', // yellow
+              'brand-red': '#EF4444', // red
+              
+              'dark-bg': '#0D0C13',
+              'dark-card': 'rgba(20, 18, 30, 0.5)',
+              'dark-card-solid': '#14121E',
+              'dark-border': 'rgba(45, 212, 191, 0.2)',
+              'brand-text': '#F8FAFC',
+              'brand-text-light': '#94A3B8', // slate-400
+            },
+            backgroundImage: {
+              'brand-gradient': 'linear-gradient(to right, #2DD4BF, #A3E635)',
+              'button-gradient': 'linear-gradient(to right, #2DD4BF, #A3E635)',
+              'cta-gradient': 'linear-gradient(to right, #2DD4BF, #A3E635, #FACC15)',
+            },
+            backdropBlur: {
+                'xl': '20px',
+            },
+            boxShadow: {
+              'glow-purple': '0 0 20px 0 rgba(45, 212, 191, 0.4)',
+              'glow-pink': '0 0 20px 0 rgba(163, 230, 53, 0.4)',
+            }
+          }
+        }
+      }
+    </script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="dark">
+    <div id="root"></div>
+
+    <!-- API Key configuration -->
+    <script src="env.js"></script>
+    
+    <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai?run",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.8",
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+    
+    <script type="module" src="index.js"></script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
