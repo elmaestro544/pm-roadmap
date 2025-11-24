@@ -23,11 +23,12 @@ const UserSettings = ({ language, currentUser }) => {
     useEffect(() => {
         let mounted = true;
         const loadSettings = async () => {
+            // Guard: Do not attempt to fetch if no user
             if (!currentUser) {
                 if (mounted) setIsLoading(false);
                 return;
             }
-            setIsLoading(true);
+
             try {
                 const settings = await getUserSettings();
                 if (mounted && settings) {
@@ -84,6 +85,8 @@ const UserSettings = ({ language, currentUser }) => {
 
     const handleSave = async (e) => {
         e.preventDefault();
+        if (!currentUser) return; // Guard
+
         setIsSaving(true);
         setError(null);
         try {

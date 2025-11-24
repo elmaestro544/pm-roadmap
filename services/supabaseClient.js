@@ -46,6 +46,8 @@ export const signIn = async (email, password) => {
 export const signOut = async () => {
     if (!supabase) return;
     const { error } = await supabase.auth.signOut();
+    // Clear any local artifacts if needed
+    localStorage.removeItem('sb-' + (new URL(supabaseUrl).hostname.split('.')[0]) + '-auth-token'); 
     return { error };
 };
 
@@ -53,12 +55,14 @@ export const getCurrentUser = async () => {
     if (!supabase) return null;
     
     try {
-        // Check for existing session first
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // 1. Get Session (Fast, Local)
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (error || !session?.user) return null;
+        if (sessionError || !session?.user) {
+            return null;
+        }
         
-        // Enrich with user metadata
+        // 2. Return User structure immediately from session
         return {
             id: session.user.id,
             email: session.user.email,
@@ -76,13 +80,13 @@ export const getCurrentUser = async () => {
 export const getUserSettings = async () => {
     if (!supabase) return null;
     try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return null;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return null;
 
         const { data, error } = await supabase
             .from('user_settings')
             .select('settings')
-            .eq('user_id', user.id)
+            .eq('user_id', session.user.id)
             .single();
 
         if (error && error.code !== 'PGRST116') { // PGRST116 is "not found", which is fine
@@ -97,12 +101,12 @@ export const getUserSettings = async () => {
 
 export const saveUserSettings = async (settings) => {
     if (!supabase) throw new Error("Supabase not configured");
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) throw new Error("User not authenticated");
 
     const { error } = await supabase
         .from('user_settings')
-        .upsert({ user_id: user.id, settings: settings });
+        .upsert({ user_id: session.user.id, settings: settings });
 
     if (error) throw error;
 };
@@ -110,20 +114,17 @@ export const saveUserSettings = async (settings) => {
 
 // --- Project Data Wrappers ---
 
-/**
- * Fetches all projects for the current user.
- */
 export const getUserProjects = async () => {
     if (!supabase) return [];
     
     try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return [];
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return [];
 
         const { data, error } = await supabase
             .from('projects')
             .select('id, title, objective, created_at, updated_at')
-            .eq('user_id', user.id)
+            .eq('user_id', session.user.id)
             .order('updated_at', { ascending: false });
 
         if (error) {
@@ -137,9 +138,6 @@ export const getUserProjects = async () => {
     }
 };
 
-/**
- * Fetches full data for a single project.
- */
 export const getProjectDetails = async (projectId) => {
     if (!supabase) return null;
 
@@ -156,19 +154,14 @@ export const getProjectDetails = async (projectId) => {
     return data;
 };
 
-/**
- * Saves or Updates a project.
- * @param {string} projectId - Optional ID. If provided, updates existing. If null, creates new.
- * @param {object} projectData - The data to save.
- */
 export const saveProject = async (projectId, projectData) => {
     if (!supabase) throw new Error("Supabase not configured");
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) throw new Error("User not authenticated");
 
     const payload = {
-        user_id: user.id,
+        user_id: session.user.id,
         title: projectData.consultingPlan?.projectTitle || projectData.objective?.substring(0, 50) || "Untitled Project",
         objective: projectData.objective,
         plan: projectData.plan,
@@ -205,17 +198,14 @@ export const saveProject = async (projectId, projectData) => {
     return result.data;
 };
 
-/**
- * Saves a chat message to history
- */
 export const saveChatMessage = async (serviceId, messageData) => {
     if (!supabase) return;
     try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return;
 
         await supabase.from('chat_history').insert([{
-            user_id: user.id,
+            user_id: session.user.id,
             service_id: serviceId,
             user_message: messageData.user,
             model_response: messageData.model,
@@ -227,26 +217,22 @@ export const saveChatMessage = async (serviceId, messageData) => {
     }
 };
 
-/**
- * Fetch chat history
- */
 export const getChatHistory = async (serviceId) => {
     if (!supabase) return [];
     try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return [];
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return [];
 
         const { data, error } = await supabase
             .from('chat_history')
             .select('*')
-            .eq('user_id', user.id)
+            .eq('user_id', session.user.id)
             .eq('service_id', serviceId)
             .order('created_at', { ascending: false })
             .limit(50);
 
         if (error) return [];
         
-        // Map to app format
         return data.map(item => ({
             id: item.id,
             user: item.user_message,

@@ -311,73 +311,63 @@ const App = () => {
     if (!isAnyModelConfigured()) {
         setApiKeyError(true);
     }
-    
-    let mounted = true;
 
     if (!supabase) {
         setIsAuthChecking(false);
         return;
     }
 
-    // Safety timeout
-    const safetyTimeout = setTimeout(() => {
-        if (mounted && isAuthChecking) {
-             console.warn("Auth check timed out - forcing render");
-             setIsAuthChecking(false);
-        }
-    }, 5000);
+    let mounted = true;
 
-    const initAuth = async () => {
-        // 1. Check session via getSession (pulls from localStorage)
+    // Strict sequential auth initialization
+    const initializeAuth = async () => {
         try {
-            const { data: { session }, error } = await supabase.auth.getSession();
-            if (session?.user && mounted) {
-                // If session exists, optimistically set user
-                const user = await getCurrentUser();
-                if (mounted) {
+            // 1. Check initial session
+            const user = await getCurrentUser();
+            
+            if (mounted) {
+                if (user) {
                     setCurrentUser(user);
-                    setIsAuthChecking(false);
                 }
-            } else if (mounted) {
-                // No session
                 setIsAuthChecking(false);
             }
-        } catch(e) {
-            console.error("Error checking session:", e);
+
+            // 2. Subscribe to changes *after* initial check
+            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+                if (!mounted) return;
+                
+                // IGNORE INITIAL_SESSION because we handled it above manually
+                if (event === 'INITIAL_SESSION') return;
+
+                if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                    const updatedUser = await getCurrentUser();
+                    if (mounted) {
+                         setCurrentUser(updatedUser);
+                         // Only redirect to dashboard on explicit sign in, not refresh
+                         if (event === 'SIGNED_IN') setView(AppView.Dashboard);
+                    }
+                } 
+                else if (event === 'SIGNED_OUT') {
+                    if (mounted) {
+                        setCurrentUser(null);
+                        setView(AppView.Home);
+                    }
+                }
+            });
+
+            return () => {
+                subscription?.unsubscribe();
+            };
+
+        } catch (e) {
+            console.error("Auth initialization error:", e);
             if (mounted) setIsAuthChecking(false);
         }
-
-        // 2. Subscribe to changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-             if (!mounted) return;
-             
-             if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-                 // Only fetch user if we haven't already (or if different)
-                 if (session?.user) {
-                     const user = await getCurrentUser();
-                     if (mounted) {
-                         setCurrentUser(user);
-                         setIsAuthChecking(false);
-                         setIsAuthModalOpen(false);
-                         if (event === 'SIGNED_IN') setView(AppView.Dashboard);
-                     }
-                 }
-             } else if (event === 'SIGNED_OUT') {
-                 if (mounted) {
-                     setCurrentUser(null);
-                     setIsAuthChecking(false);
-                     setView(AppView.Home);
-                 }
-             }
-        });
-        
-        return () => {
-            subscription?.unsubscribe();
-        };
     };
 
-    const unsubscribePromise = initAuth();
+    const unsubscribePromise = initializeAuth();
 
+    // Welcome modal check
     const hasSeenWelcome = sessionStorage.getItem('hasSeenWelcomeModal');
     if (!hasSeenWelcome) {
         setIsWelcomeModalOpen(true);
@@ -386,20 +376,29 @@ const App = () => {
 
     return () => {
         mounted = false;
-        clearTimeout(safetyTimeout);
         unsubscribePromise.then(unsub => unsub && unsub());
     };
   }, []); 
 
   
   const handleLogout = async () => {
-    await signOut();
-    // The listener will handle state updates for current user and view
+    try {
+        await signOut();
+    } catch(e) {
+        console.error("Sign out error", e);
+    } finally {
+        // Force local state clear regardless of network result
+        setCurrentUser(null);
+        setView(AppView.Home);
+    }
   };
 
   const handleLoginSuccess = async () => {
+      // Small delay to allow session to propagate locally
+      setIsAuthChecking(true);
       const user = await getCurrentUser();
       setCurrentUser(user);
+      setIsAuthChecking(false);
       setIsAuthModalOpen(false);
       setView(AppView.Dashboard);
   };
@@ -419,7 +418,6 @@ const App = () => {
       setView(AppView.Admin);
   };
 
-  // Prevent rendering until we know auth state to avoid flashing "Logged Out" UI
   if (isAuthChecking) {
       return React.createElement('div', { className: "min-h-screen flex items-center justify-center bg-dark-bg text-white" },
         React.createElement(Spinner, { size: "12" })
