@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { i18n } from '../constants.js';
 import { generateProjectPlan } from '../services/planningService.js';
@@ -36,7 +37,7 @@ const ResultsView = ({ plan }) => {
         )
     );
 
-    return React.createElement('div', { className: 'w-full flex flex-col animate-fade-in-up' },
+    return React.createElement('div', { className: 'w-full flex flex-col animate-fade-in-up pb-10' },
         React.createElement('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-6 print:block' },
             // Work Breakdown Structure Column
             React.createElement('div', { className: 'print:mb-8' },
@@ -173,7 +174,7 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
        React.createElement('div', { className: 'flex-grow min-h-0 overflow-y-auto' },
            React.createElement('div', {
                ref: contentRef,
-               className: 'p-6 printable-content h-full',
+               className: 'p-6 printable-content min-h-full w-full',
                style: { transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.2s ease' },
                contentEditable: isEditing,
                suppressContentEditableWarning: true

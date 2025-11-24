@@ -1,3 +1,4 @@
+
 import { Type } from "@google/genai";
 import { generateAIContent } from "./geminiService.js";
 
@@ -51,10 +52,12 @@ export const generateProjectPlan = async (objective) => {
     const prompt = `Based on the following project objective, create a comprehensive project plan.
     Objective: "${objective}"
     
-    1. Generate a detailed Work Breakdown Structure (WBS) with at least 4-5 main phases/tasks.
-    2. Each main task MUST have subtasks.
-    3. Define at least 3-4 key milestones.
-    4. Ensure the durations and assignee counts are realistic estimates.
+    1. Generate a detailed Work Breakdown Structure (WBS) that MUST START FROM PHASE 1 (e.g. Planning/Mobilization/Design).
+    2. Cover the full lifecycle including execution and closure.
+    3. Include at least 4-5 main phases/tasks in chronological order.
+    4. Each main task MUST have subtasks.
+    5. Define at least 3-4 key milestones.
+    6. Ensure the durations and assignee counts are realistic estimates.
     
     The output must be valid JSON matching the schema.`;
 
