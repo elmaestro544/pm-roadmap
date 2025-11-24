@@ -23,7 +23,10 @@ const UserSettings = ({ language, currentUser }) => {
     useEffect(() => {
         let mounted = true;
         const loadSettings = async () => {
-            if (!currentUser) return;
+            if (!currentUser) {
+                if (mounted) setIsLoading(false);
+                return;
+            }
             setIsLoading(true);
             try {
                 const settings = await getUserSettings();
@@ -180,7 +183,7 @@ const UserSettings = ({ language, currentUser }) => {
                                     className: "w-full p-3 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none"
                                 },
                                     // Default/Fallback options if fetch hasn't happened
-                                    availableModels.length > 0 
+                                    Array.isArray(availableModels) && availableModels.length > 0 
                                         ? availableModels.map(m => React.createElement('option', { key: m.id, value: m.id }, m.name || m.id))
                                         : (
                                             formData.aiProvider === 'google' ? [

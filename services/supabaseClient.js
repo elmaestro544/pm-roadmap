@@ -14,7 +14,8 @@ export const supabase = isValidSupabaseConfig()
         auth: {
             persistSession: true,
             autoRefreshToken: true,
-            detectSessionInUrl: true
+            detectSessionInUrl: true,
+            storage: window.localStorage
         }
     }) 
     : null;
@@ -51,37 +52,47 @@ export const signOut = async () => {
 export const getCurrentUser = async () => {
     if (!supabase) return null;
     
-    // Check for existing session first
-    const { data: { session }, error } = await supabase.auth.getSession();
-    
-    if (error || !session?.user) return null;
-    
-    // Enrich with user metadata
-    return {
-        id: session.user.id,
-        email: session.user.email,
-        fullName: session.user.user_metadata?.full_name || 'User',
-        ...session.user
-    };
+    try {
+        // Check for existing session first
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error || !session?.user) return null;
+        
+        // Enrich with user metadata
+        return {
+            id: session.user.id,
+            email: session.user.email,
+            fullName: session.user.user_metadata?.full_name || 'User',
+            ...session.user
+        };
+    } catch (e) {
+        console.warn("Error getting current user:", e);
+        return null;
+    }
 };
 
 // --- User Settings (AI Configuration) ---
 
 export const getUserSettings = async () => {
     if (!supabase) return null;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return null;
 
-    const { data, error } = await supabase
-        .from('user_settings')
-        .select('settings')
-        .eq('user_id', user.id)
-        .single();
+        const { data, error } = await supabase
+            .from('user_settings')
+            .select('settings')
+            .eq('user_id', user.id)
+            .single();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 is "not found", which is fine
-        console.error("Error fetching user settings:", error);
+        if (error && error.code !== 'PGRST116') { // PGRST116 is "not found", which is fine
+            console.error("Error fetching user settings:", error);
+        }
+        return data?.settings || null;
+    } catch (e) {
+        console.warn("Error in getUserSettings:", e);
+        return null;
     }
-    return data?.settings || null;
 };
 
 export const saveUserSettings = async (settings) => {
@@ -105,20 +116,25 @@ export const saveUserSettings = async (settings) => {
 export const getUserProjects = async () => {
     if (!supabase) return [];
     
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return [];
 
-    const { data, error } = await supabase
-        .from('projects')
-        .select('id, title, objective, created_at, updated_at')
-        .eq('user_id', user.id)
-        .order('updated_at', { ascending: false });
+        const { data, error } = await supabase
+            .from('projects')
+            .select('id, title, objective, created_at, updated_at')
+            .eq('user_id', user.id)
+            .order('updated_at', { ascending: false });
 
-    if (error) {
-        console.error("Error fetching projects:", error);
+        if (error) {
+            console.error("Error fetching projects:", error);
+            return [];
+        }
+        return data || [];
+    } catch (e) {
+        console.error("Exception fetching projects:", e);
         return [];
     }
-    return data;
 };
 
 /**
@@ -194,17 +210,21 @@ export const saveProject = async (projectId, projectData) => {
  */
 export const saveChatMessage = async (serviceId, messageData) => {
     if (!supabase) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-    await supabase.from('chat_history').insert([{
-        user_id: user.id,
-        service_id: serviceId,
-        user_message: messageData.user,
-        model_response: messageData.model,
-        sources: messageData.sources,
-        file_name: messageData.file
-    }]);
+        await supabase.from('chat_history').insert([{
+            user_id: user.id,
+            service_id: serviceId,
+            user_message: messageData.user,
+            model_response: messageData.model,
+            sources: messageData.sources,
+            file_name: messageData.file
+        }]);
+    } catch (e) {
+        console.warn("Failed to save chat message", e);
+    }
 };
 
 /**
@@ -212,26 +232,31 @@ export const saveChatMessage = async (serviceId, messageData) => {
  */
 export const getChatHistory = async (serviceId) => {
     if (!supabase) return [];
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return [];
 
-    const { data, error } = await supabase
-        .from('chat_history')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('service_id', serviceId)
-        .order('created_at', { ascending: false })
-        .limit(50);
+        const { data, error } = await supabase
+            .from('chat_history')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('service_id', serviceId)
+            .order('created_at', { ascending: false })
+            .limit(50);
 
-    if (error) return [];
-    
-    // Map to app format
-    return data.map(item => ({
-        id: item.id,
-        user: item.user_message,
-        model: item.model_response,
-        file: item.file_name,
-        sources: item.sources,
-        timestamp: item.created_at
-    }));
+        if (error) return [];
+        
+        // Map to app format
+        return data.map(item => ({
+            id: item.id,
+            user: item.user_message,
+            model: item.model_response,
+            file: item.file_name,
+            sources: item.sources,
+            timestamp: item.created_at
+        }));
+    } catch (e) {
+        console.warn("Failed to fetch history", e);
+        return [];
+    }
 };

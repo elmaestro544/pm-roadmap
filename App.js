@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { AppView, Language, i18n } from './constants.js';
 import Home from './components/Home.js';
@@ -10,8 +9,8 @@ import Pricing from './components/Pricing.js';
 import Terms from './components/Terms.js';
 import Privacy from './components/Privacy.js';
 import AdminDashboard from './components/AdminDashboard.js';
-import UserSettings from './components/UserSettings.js'; // Import
-import { UserIcon, Logo, MenuIcon, CloseIcon, FacebookIcon, LinkedinIcon, TelegramIcon, SettingsIcon, Spinner } from './components/Shared.js';
+import UserSettings from './components/UserSettings.js'; 
+import { UserIcon, Logo, MenuIcon, CloseIcon, FacebookIcon, LinkedinIcon, TelegramIcon, SettingsIcon, Spinner, LockIcon } from './components/Shared.js';
 import { isAnyModelConfigured } from './services/geminiService.js';
 import AuthModal from './components/AuthModal.js';
 import { supabase, getCurrentUser, signOut } from './services/supabaseClient.js';
@@ -66,10 +65,8 @@ const Header = ({ currentView, setView, language, setLanguage, isAuthenticated, 
       if (link.isPage) {
           setView(link.view);
       } else {
-          // If not on home page, go there first, then scroll
           if (currentView !== AppView.Home) {
               setView(AppView.Home);
-              // Use timeout to allow page to render before scrolling
               setTimeout(() => {
                   document.getElementById(link.view)?.scrollIntoView({ behavior: 'smooth' });
               }, 100);
@@ -81,11 +78,9 @@ const Header = ({ currentView, setView, language, setLanguage, isAuthenticated, 
 
   return React.createElement('header', { className: "sticky top-0 z-50 bg-dark-bg/80 backdrop-blur-xl border-b border-dark-border" },
     React.createElement('nav', { className: "container mx-auto px-6 py-3 flex justify-between items-center" },
-      // Left: Logo
       React.createElement('button', { onClick: () => setView(AppView.Home), className: "flex items-center gap-3" },
           React.createElement(Logo, null)
       ),
-      // Center: Nav Links
       React.createElement('div', { className: 'hidden md:flex items-center gap-8' },
         navLinks.map(link => 
           React.createElement('button', {
@@ -95,7 +90,6 @@ const Header = ({ currentView, setView, language, setLanguage, isAuthenticated, 
           }, link.label)
         )
       ),
-      // Right: Controls
       React.createElement('div', { className: 'hidden md:flex items-center gap-4' },
         isAuthenticated ? (
           React.createElement('div', { className: 'flex items-center gap-4' },
@@ -116,7 +110,6 @@ const Header = ({ currentView, setView, language, setLanguage, isAuthenticated, 
                         React.createElement('span', { className: 'text-[10px] text-brand-text-light' }, "My Account")
                     )
                 ),
-                // User Dropdown
                 isUserMenuOpen && React.createElement('div', { 
                     className: "absolute top-full right-0 mt-2 w-48 bg-dark-card-solid border border-dark-border rounded-lg shadow-xl py-2 z-50 animate-fade-in-up"
                 },
@@ -144,7 +137,6 @@ const Header = ({ currentView, setView, language, setLanguage, isAuthenticated, 
           className: "text-sm font-semibold text-white px-3 py-1.5 rounded-full hover:bg-dark-card-solid transition-colors"
         }, language === Language.EN ? 'العربية' : 'English')
       ),
-      // Mobile Menu Button
       React.createElement('div', { className: "md:hidden" },
         React.createElement('button', { onClick: onMenuToggle, className: "p-2 text-brand-text-light rounded-md" }, React.createElement(MenuIcon, null))
       )
@@ -221,14 +213,12 @@ const Footer = ({ language, setView, contactEmail, onAdminClick }) => {
   return React.createElement('footer', { className: "bg-dark-bg border-t border-dark-border" },
     React.createElement('div', { className: "container mx-auto px-6 py-12" },
       React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-4 gap-8" },
-        // Column 1: Brand
         React.createElement('div', { className: "md:col-span-1" },
           React.createElement('button', { onClick: () => setView(AppView.Home), className: "flex items-center gap-3 mb-4" },
             React.createElement(Logo, null)
           ),
           React.createElement('p', { className: "text-brand-text-light text-sm" }, t.homeHeroDescription)
         ),
-        // Column 2: Links
         React.createElement('div', null,
           React.createElement('h3', { className: "font-bold text-lg text-white mb-4" }, "Links"),
           React.createElement('ul', { className: "space-y-3" },
@@ -238,7 +228,6 @@ const Footer = ({ language, setView, contactEmail, onAdminClick }) => {
             React.createElement('li', null, React.createElement('button', { onClick: onAdminClick, className: "text-brand-text-light hover:text-brand-purple-light transition-colors" }, t.navAdmin))
           )
         ),
-        // Column 3: Help
         React.createElement('div', null,
           React.createElement('h3', { className: "font-bold text-lg text-white mb-4" }, "Help"),
           React.createElement('ul', { className: "space-y-3" },
@@ -247,7 +236,6 @@ const Footer = ({ language, setView, contactEmail, onAdminClick }) => {
             React.createElement('li', null, React.createElement('button', { onClick: () => setView(AppView.Privacy), className: "text-brand-text-light hover:text-brand-purple-light transition-colors" }, t.navPrivacy))
           )
         ),
-        // Column 4: Contact
         React.createElement('div', null,
           React.createElement('h3', { className: "font-bold text-lg text-white mb-4" }, t.navContact),
           React.createElement('p', { className: "text-brand-text-light" }, contactEmail)
@@ -273,7 +261,7 @@ const App = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAuthModalAdminMode, setIsAuthModalAdminMode] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [isAuthChecking, setIsAuthChecking] = useState(true); // New Loading state for Auth
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
   const [theme, setTheme] = useState('dark');
@@ -325,9 +313,13 @@ const App = () => {
     }
     
     let mounted = true;
-    let subscription = null;
 
-    // Safety timeout: stop loading after 5 seconds max if logic hangs
+    if (!supabase) {
+        setIsAuthChecking(false);
+        return;
+    }
+
+    // Safety timeout
     const safetyTimeout = setTimeout(() => {
         if (mounted && isAuthChecking) {
              console.warn("Auth check timed out - forcing render");
@@ -336,23 +328,39 @@ const App = () => {
     }, 5000);
 
     const initAuth = async () => {
-        if (!supabase) {
+        // 1. Check session via getSession (pulls from localStorage)
+        try {
+            const { data: { session }, error } = await supabase.auth.getSession();
+            if (session?.user && mounted) {
+                // If session exists, optimistically set user
+                const user = await getCurrentUser();
+                if (mounted) {
+                    setCurrentUser(user);
+                    setIsAuthChecking(false);
+                }
+            } else if (mounted) {
+                // No session
+                setIsAuthChecking(false);
+            }
+        } catch(e) {
+            console.error("Error checking session:", e);
             if (mounted) setIsAuthChecking(false);
-            return;
         }
 
-        // 1. Subscribe to auth changes synchronously first
-        const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+        // 2. Subscribe to changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
              if (!mounted) return;
              
-             if (event === 'SIGNED_IN') {
-                 // Fetch full user data including metadata
-                 const user = await getCurrentUser();
-                 if (mounted) {
-                     setCurrentUser(user);
-                     setIsAuthChecking(false);
-                     setIsAuthModalOpen(false);
-                     setView(AppView.Dashboard);
+             if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+                 // Only fetch user if we haven't already (or if different)
+                 if (session?.user) {
+                     const user = await getCurrentUser();
+                     if (mounted) {
+                         setCurrentUser(user);
+                         setIsAuthChecking(false);
+                         setIsAuthModalOpen(false);
+                         if (event === 'SIGNED_IN') setView(AppView.Dashboard);
+                     }
                  }
              } else if (event === 'SIGNED_OUT') {
                  if (mounted) {
@@ -360,32 +368,15 @@ const App = () => {
                      setIsAuthChecking(false);
                      setView(AppView.Home);
                  }
-             } else if (event === 'TOKEN_REFRESHED') {
-                 // Session refreshed, ensure loading is off
-                 if (mounted) setIsAuthChecking(false);
              }
         });
-        subscription = data.subscription;
-
-        // 2. Perform initial session check
-        try {
-            const { data: { session }, error } = await supabase.auth.getSession();
-            
-            if (session?.user) {
-                const user = await getCurrentUser();
-                if (mounted) setCurrentUser(user);
-            }
-        } catch (e) {
-            console.error("Auth init error", e);
-        } finally {
-            if (mounted) {
-                setIsAuthChecking(false);
-                clearTimeout(safetyTimeout);
-            }
-        }
+        
+        return () => {
+            subscription?.unsubscribe();
+        };
     };
 
-    initAuth();
+    const unsubscribePromise = initAuth();
 
     const hasSeenWelcome = sessionStorage.getItem('hasSeenWelcomeModal');
     if (!hasSeenWelcome) {
@@ -396,7 +387,7 @@ const App = () => {
     return () => {
         mounted = false;
         clearTimeout(safetyTimeout);
-        if (subscription) subscription.unsubscribe();
+        unsubscribePromise.then(unsub => unsub && unsub());
     };
   }, []); 
 
