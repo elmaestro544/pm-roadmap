@@ -7,7 +7,7 @@ window.process.env = {
 
   // --- Google Gemini ---
   // Get your key from: https://aistudio.google.com/app/apikey
-  API_KEY: 'AIzaSyDlJEVMudhun7nbZkVHxm5yxbGlabDxRCI',
+  API_KEY: 'AIzaSyAaQImfXZRsNNWi-TsdJSISBd_Wb1pFaEo',
 
   // --- Supabase Configuration ---
   // 1. Go to Supabase Dashboard -> Project Settings -> API

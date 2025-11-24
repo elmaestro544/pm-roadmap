@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import { i18n } from '../constants.js';
 import { generateProjectPlan } from '../services/planningService.js';
@@ -25,7 +23,7 @@ const LoadingView = ({ progress }) => (
 );
 
 const ResultsView = ({ plan }) => {
-    const renderCardFooter = (item) => React.createElement('div', { className: 'flex items-center justify-between text-brand-text-light mt-4 pt-4 border-t border-dark-border' },
+    const renderCardFooter = (item) => React.createElement('div', { className: 'flex items-center justify-between text-brand-text-light mt-4 pt-4 border-t border-dark-border print:border-gray-300' },
         React.createElement('div', { className: 'flex items-center gap-4 text-sm' },
             React.createElement('div', { className: 'flex items-center gap-1.5', title: 'Assignees' },
                 React.createElement(UserIcon, { className: 'h-4 w-4' }),
@@ -39,20 +37,20 @@ const ResultsView = ({ plan }) => {
     );
 
     return React.createElement('div', { className: 'w-full flex flex-col animate-fade-in-up' },
-        React.createElement('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-6' },
+        React.createElement('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-6 print:block' },
             // Work Breakdown Structure Column
-            React.createElement('div', null,
-                React.createElement('h3', { className: 'text-xl font-semibold mb-4 flex items-center justify-between text-white' },
+            React.createElement('div', { className: 'print:mb-8' },
+                React.createElement('h3', { className: 'text-xl font-semibold mb-4 flex items-center justify-between text-white print:text-black' },
                     "Work Breakdown Structure",
-                    React.createElement('button', { className: 'p-2 rounded-full bg-dark-card-solid hover:bg-white/10' }, React.createElement(PlusIcon, { className: 'h-4 w-4' }))
+                    React.createElement('button', { className: 'p-2 rounded-full bg-dark-card-solid hover:bg-white/10 print:hidden' }, React.createElement(PlusIcon, { className: 'h-4 w-4' }))
                 ),
                 React.createElement('div', { className: 'space-y-4' }, plan.workBreakdownStructure?.map((task, index) =>
-                    React.createElement('div', { key: index, className: 'bg-dark-card-solid border border-dark-border rounded-lg p-4' },
-                        React.createElement('h4', { className: 'font-bold text-white' }, task.name),
-                        React.createElement('p', { className: 'text-sm text-brand-text-light mt-1' }, task.description),
+                    React.createElement('div', { key: index, className: 'bg-dark-card-solid border border-dark-border rounded-lg p-4 break-inside-avoid print:bg-white print:border-gray-300 print:text-black print:shadow-none' },
+                        React.createElement('h4', { className: 'font-bold text-white print:text-black' }, task.name),
+                        React.createElement('p', { className: 'text-sm text-brand-text-light mt-1 print:text-gray-700' }, task.description),
                         task.subtasks && task.subtasks.length > 0 && (
                              React.createElement('div', { className: 'mt-3 space-y-2 text-sm' }, task.subtasks.map((sub, sIndex) =>
-                                React.createElement('div', { key: sIndex, className: 'pl-4 border-l-2 border-dark-border' }, sub.name)
+                                React.createElement('div', { key: sIndex, className: 'pl-4 border-l-2 border-dark-border print:border-gray-300' }, sub.name)
                              ))
                         ),
                         renderCardFooter(task)
@@ -61,14 +59,14 @@ const ResultsView = ({ plan }) => {
             ),
             // Key Milestones Column
             React.createElement('div', null,
-                React.createElement('h3', { className: 'text-xl font-semibold mb-4 flex items-center justify-between text-white' },
+                React.createElement('h3', { className: 'text-xl font-semibold mb-4 flex items-center justify-between text-white print:text-black' },
                     "Key Milestones",
-                    React.createElement('button', { className: 'p-2 rounded-full bg-dark-card-solid hover:bg-white/10' }, React.createElement(PlusIcon, { className: 'h-4 w-4' }))
+                    React.createElement('button', { className: 'p-2 rounded-full bg-dark-card-solid hover:bg-white/10 print:hidden' }, React.createElement(PlusIcon, { className: 'h-4 w-4' }))
                 ),
                 React.createElement('div', { className: 'space-y-4' }, plan.keyMilestones?.map((milestone, index) =>
-                    React.createElement('div', { key: index, className: 'bg-dark-card-solid border border-dark-border rounded-lg p-4' },
-                        React.createElement('h4', { className: 'font-bold text-white' }, milestone.name),
-                        React.createElement('p', { className: 'text-sm text-brand-text-light mt-1' }, milestone.acceptanceCriteria),
+                    React.createElement('div', { key: index, className: 'bg-dark-card-solid border border-dark-border rounded-lg p-4 break-inside-avoid print:bg-white print:border-gray-300 print:text-black print:shadow-none' },
+                        React.createElement('h4', { className: 'font-bold text-white print:text-black' }, milestone.name),
+                        React.createElement('p', { className: 'text-sm text-brand-text-light mt-1 print:text-gray-700' }, milestone.acceptanceCriteria),
                         renderCardFooter(milestone)
                     ))
                 )
@@ -112,6 +110,16 @@ const InputView = ({ onGenerate, isLoading, error }) => {
 const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, isLoading, setIsLoading, error, setError }) => {
     const t = i18n[language];
     const fullscreenRef = useRef(null);
+    const contentRef = useRef(null);
+
+    // Toolbar State
+    const [zoomLevel, setZoomLevel] = useState(1);
+    const [isEditing, setIsEditing] = useState(false);
+
+    const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 1.5));
+    const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.7));
+    const handleToggleEdit = () => setIsEditing(prev => !prev);
+    const handleExport = () => window.print();
 
     // Effect to auto-generate plan when objective is set
     useEffect(() => {
@@ -133,6 +141,8 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
         }
     }, [projectData.objective, projectData.plan, isLoading, onUpdateProject, setIsLoading, setError, onResetProject]);
 
+    const hasPlan = !!projectData.plan;
+
     const renderContent = () => {
         if (!projectData.objective) {
             return React.createElement(InputView, {
@@ -147,16 +157,30 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
         if (projectData.plan) {
             return React.createElement(ResultsView, { plan: projectData.plan });
         }
-        // This state can happen briefly between objective being set and loading starting
         return React.createElement(LoadingView, null); 
     };
     
     return React.createElement('div', { ref: fullscreenRef, className: "h-full flex flex-col text-white bg-dark-card printable-container" },
+       hasPlan && React.createElement(FeatureToolbar, {
+            title: t.dashboardPlanning,
+            containerRef: fullscreenRef,
+            onZoomIn: handleZoomIn,
+            onZoomOut: handleZoomOut,
+            onToggleEdit: handleToggleEdit,
+            isEditing: isEditing,
+            onExport: handleExport,
+       }),
        React.createElement('div', { className: 'flex-grow min-h-0 overflow-y-auto' },
            React.createElement('div', {
-               className: 'p-6 printable-content h-full flex items-center justify-center',
+               ref: contentRef,
+               className: 'p-6 printable-content h-full',
+               style: { transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.2s ease' },
+               contentEditable: isEditing,
+               suppressContentEditableWarning: true
            },
-               renderContent()
+               !hasPlan && !isLoading 
+                ? React.createElement('div', { className: 'h-full flex items-center justify-center'}, renderContent())
+                : renderContent()
            )
        )
     );

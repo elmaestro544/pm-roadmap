@@ -1,4 +1,3 @@
-
 import { Type } from "@google/genai";
 import { generateAIContent } from "./geminiService.js";
 
@@ -51,13 +50,26 @@ const projectPlanSchema = {
 export const generateProjectPlan = async (objective) => {
     const prompt = `Based on the following project objective, create a comprehensive project plan.
     Objective: "${objective}"
-    Generate a detailed Work Breakdown Structure (WBS) with logical phases and actionable tasks/subtasks. Also, define a set of key milestones. Ensure the durations and assignee counts are realistic estimates. The output must be valid JSON matching the schema.`;
+    
+    1. Generate a detailed Work Breakdown Structure (WBS) with at least 4-5 main phases/tasks.
+    2. Each main task MUST have subtasks.
+    3. Define at least 3-4 key milestones.
+    4. Ensure the durations and assignee counts are realistic estimates.
+    
+    The output must be valid JSON matching the schema.`;
 
     const systemInstruction = "You are an expert AI Project Manager. Break down objectives into WBS and Milestones.";
 
     try {
         const jsonText = await generateAIContent(prompt, projectPlanSchema, systemInstruction);
-        return JSON.parse(jsonText.trim());
+        const parsed = JSON.parse(jsonText.trim());
+        
+        // Basic validation to prevent "missing data" issues if AI returns empty arrays
+        if (!parsed.workBreakdownStructure || parsed.workBreakdownStructure.length === 0) {
+            throw new Error("AI returned empty Work Breakdown Structure. Please try again with a more detailed objective.");
+        }
+        
+        return parsed;
     } catch (error) {
         console.error("Error generating project plan:", error);
         throw new Error(`Failed to generate the project plan: ${error.message}`);
