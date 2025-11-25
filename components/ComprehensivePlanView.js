@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect } from 'react';
 import { generateConsultingPlan } from '../services/comprehensivePlanService.js';
 import { DocumentIcon, Spinner, FeatureToolbar } from './Shared.js';
@@ -108,7 +109,10 @@ const InputView = ({ onGenerate, isLoading, error }) => {
         field: '',
         name: '',
         scope: '',
-        location: ''
+        location: '',
+        budget: '',
+        currency: 'USD',
+        duration: ''
     });
 
     const predefinedFields = [
@@ -141,6 +145,8 @@ const InputView = ({ onGenerate, isLoading, error }) => {
         "France",
         "Global / Remote"
     ];
+    
+    const currencies = ["USD", "EUR", "GBP", "SAR", "AED", "EGP", "KWD", "QAR", "OMR", "BHD", "INR", "CNY", "JPY"];
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -191,18 +197,49 @@ const InputView = ({ onGenerate, isLoading, error }) => {
                     className: 'w-full p-3 bg-dark-bg border border-dark-border rounded-lg text-white resize-none focus:ring-2 focus:ring-brand-purple focus:outline-none'
                 })
             ),
+            React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4' },
+                React.createElement('div', null,
+                    React.createElement('label', { className: 'block text-sm font-medium text-brand-text-light mb-1' }, "Geographical Location"),
+                    React.createElement('input', {
+                        name: 'location',
+                        list: 'location-options',
+                        value: formData.location,
+                        onChange: handleChange,
+                        placeholder: "Select or type location...",
+                        className: 'w-full p-3 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none'
+                    }),
+                    React.createElement('datalist', { id: 'location-options' },
+                        predefinedLocations.map((l, i) => React.createElement('option', { key: i, value: l }))
+                    )
+                ),
+                 React.createElement('div', null,
+                    React.createElement('label', { className: 'block text-sm font-medium text-brand-text-light mb-1' }, "Duration Constraint"),
+                    React.createElement('input', {
+                        name: 'duration',
+                        value: formData.duration,
+                        onChange: handleChange,
+                        placeholder: "e.g., 18 months, 2 years...",
+                        className: 'w-full p-3 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none'
+                    })
+                )
+            ),
             React.createElement('div', null,
-                React.createElement('label', { className: 'block text-sm font-medium text-brand-text-light mb-1' }, "Geographical Location"),
-                React.createElement('input', {
-                    name: 'location',
-                    list: 'location-options',
-                    value: formData.location,
-                    onChange: handleChange,
-                    placeholder: "Select or type location...",
-                    className: 'w-full p-3 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none'
-                }),
-                React.createElement('datalist', { id: 'location-options' },
-                    predefinedLocations.map((l, i) => React.createElement('option', { key: i, value: l }))
+                React.createElement('label', { className: 'block text-sm font-medium text-brand-text-light mb-1' }, "Total Budget (Optional)"),
+                React.createElement('div', { className: 'flex gap-2' },
+                    React.createElement('input', {
+                        name: 'budget',
+                        type: 'number',
+                        value: formData.budget,
+                        onChange: handleChange,
+                        placeholder: "e.g., 500000",
+                        className: 'w-full p-3 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none'
+                    }),
+                    React.createElement('select', {
+                        name: 'currency',
+                        value: formData.currency,
+                        onChange: handleChange,
+                        className: 'w-24 p-3 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none font-bold'
+                    }, currencies.map(c => React.createElement('option', { key: c, value: c }, c)))
                 )
             ),
             error && React.createElement('div', { className: "bg-red-500/10 border border-red-500/30 text-center p-2 rounded-md text-sm text-red-400 font-semibold" }, error),

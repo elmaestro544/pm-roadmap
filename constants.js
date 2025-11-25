@@ -19,17 +19,19 @@ export const Language = Object.freeze({
   AR: 'ar',
 });
 
+// Reordered to match logical project workflow: 
+// Plan -> Planning -> Scheduling -> Budget -> Risk -> Structure -> Agents -> KPIs -> S-Curve -> Assistant
 export const DASHBOARD_VIEWS = [
-    { id: 'assistant', titleKey: 'dashboardAssistant', icon: AssistantIcon },
     { id: 'consultingPlan', titleKey: 'dashboardConsultingPlan', icon: DocumentIcon },
     { id: 'planning', titleKey: 'dashboardPlanning', icon: PlanningIcon },
     { id: 'scheduling', titleKey: 'dashboardScheduling', icon: ScheduleIcon },
+    { id: 'budget', titleKey: 'dashboardBudget', icon: BudgetIcon },
+    { id: 'risk', titleKey: 'dashboardRisk', icon: RiskIcon },
+    { id: 'structure', titleKey: 'dashboardStructure', icon: StructureIcon },
+    { id: 'agents', titleKey: 'dashboardAgents', icon: AgentIcon },
     { id: 'kpis', titleKey: 'dashboardKpis', icon: KpiIcon },
     { id: 'scurve', titleKey: 'dashboardSCurve', icon: SCurveIcon },
-    { id: 'structure', titleKey: 'dashboardStructure', icon: StructureIcon },
-    { id: 'risk', titleKey: 'dashboardRisk', icon: RiskIcon },
-    { id: 'budget', titleKey: 'dashboardBudget', icon: BudgetIcon },
-    { id: 'agents', titleKey: 'dashboardAgents', icon: AgentIcon },
+    { id: 'assistant', titleKey: 'dashboardAssistant', icon: AssistantIcon },
 ];
 
 export const i18n = {

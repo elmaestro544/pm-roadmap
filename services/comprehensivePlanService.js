@@ -1,4 +1,5 @@
 
+
 import { Type } from "@google/genai";
 import { generateAIContent } from "./geminiService.js";
 
@@ -24,10 +25,16 @@ const consultingPlanSchema = {
 };
 
 export const generateConsultingPlan = async (details) => {
-    const { field, name, scope, location } = details;
+    const { field, name, scope, location, budget, currency, duration } = details;
+    
+    let constraints = "";
+    if (budget) constraints += `Budget Constraint: ${currency} ${budget}. `;
+    if (duration) constraints += `Time Constraint: ${duration}. `;
+
     const prompt = `
         Build a professional Project Management Plan.
         Project: "${name}", Field: "${field}", Scope: "${scope}", Location: "${location}".
+        ${constraints}
         Include: Executive Summary, Standards (PMI/ISO), Governance (RACI), Risk, QA, Lessons Learned.
         Output as JSON with Markdown text content.
     `;

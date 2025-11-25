@@ -1,7 +1,5 @@
 
 
-
-
 import React, { useState, useEffect } from 'react';
 import { i18n, DASHBOARD_VIEWS } from '../constants.js';
 import AssistantView from './SciGeniusChat.js';
@@ -19,7 +17,8 @@ import ComprehensivePlanView from './ComprehensivePlanView.js';
 import { UserIcon, SidebarToggleIcon, Logo, Spinner, HistoryIcon, PlusIcon } from './Shared.js';
 import { getUserProjects, getProjectDetails, saveProject } from '../services/supabaseClient.js';
 
-const WORKFLOW_ORDER = ['consultingPlan', 'planning', 'scheduling', 'budget', 'risk', 'kpis', 'scurve', 'structure', 'agents', 'assistant'];
+// Updated workflow order
+const WORKFLOW_ORDER = ['consultingPlan', 'planning', 'scheduling', 'budget', 'risk', 'structure', 'agents', 'kpis', 'scurve', 'assistant'];
 
 const PREREQUISITES = {
     planning: 'objective', // Planning needs an objective (which comes from Consulting Plan or manual entry)
@@ -27,6 +26,7 @@ const PREREQUISITES = {
     budget: 'objective',
     risk: 'objective',
     structure: 'objective',
+    agents: 'objective',
     kpis: 'budget', // also needs schedule, but budget is a good gate
     scurve: 'schedule',
 };
