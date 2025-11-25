@@ -17,7 +17,7 @@ import ComprehensivePlanView from './ComprehensivePlanView.js';
 import { UserIcon, SidebarToggleIcon, Logo, Spinner, HistoryIcon, PlusIcon } from './Shared.js';
 import { getUserProjects, getProjectDetails, saveProject } from '../services/supabaseClient.js';
 
-// Updated workflow order
+// Updated workflow order to match DASHBOARD_VIEWS in constants.js
 const WORKFLOW_ORDER = ['consultingPlan', 'planning', 'scheduling', 'budget', 'risk', 'structure', 'agents', 'kpis', 'scurve', 'assistant'];
 
 const PREREQUISITES = {

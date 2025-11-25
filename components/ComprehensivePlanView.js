@@ -385,7 +385,7 @@ const ComprehensivePlanView = ({ language, projectData, onUpdateProject, isLoadi
         React.createElement('div', { className: 'flex-grow min-h-0 overflow-auto' },
             React.createElement('div', {
                ref: contentRef,
-               className: 'p-8 printable-content min-h-full w-full',
+               className: 'p-8 printable-content w-full pb-32 min-h-full', // Ensure min-h-full for scroll and pb-32 for padding
                style: { transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.2s ease' },
                contentEditable: isEditing,
                suppressContentEditableWarning: true

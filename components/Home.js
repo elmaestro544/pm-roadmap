@@ -275,8 +275,16 @@ const Home = ({ language, setView, settings }) => {
         }, [features.length]);
 
         return React.createElement('section', { className: 'relative overflow-hidden' },
-            // START NEW CODE: Gradient Lights controlled by Admin Settings
-             React.createElement('div', { className: 'absolute top-0 inset-x-0 h-[800px] pointer-events-none z-0' },
+            // START NEW CODE: Gradient Lights and Motion Effects controlled by Admin Settings
+             React.createElement('div', { className: 'absolute top-0 inset-x-0 h-[800px] pointer-events-none z-0 overflow-hidden' },
+                // Animated Background Grid
+                React.createElement('div', { className: 'absolute inset-0 bg-grid-motion opacity-20' }),
+                
+                // Floating Blobs
+                React.createElement('div', { className: 'bg-blob w-96 h-96 bg-brand-purple/20 top-[-50px] left-[-100px]', style: { animationDelay: '0s' } }),
+                React.createElement('div', { className: 'bg-blob w-80 h-80 bg-brand-pink/20 top-[100px] right-[-50px]', style: { animationDelay: '5s' } }),
+                React.createElement('div', { className: 'bg-blob w-64 h-64 bg-brand-cyan/20 bottom-[100px] left-[20%]', style: { animationDelay: '10s' } }),
+
                 // Top Glow Line
                 React.createElement('div', { className: 'absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-brand-purple-light to-transparent', style: { opacity: 0.7 + (bgIntensity * 0.3), boxShadow: `0 0 40px rgba(94,234,212,${0.6 * bgIntensity})` } }),
                 // Main Turquoise Glow

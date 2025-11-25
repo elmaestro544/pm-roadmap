@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { i18n } from '../constants.js';
 import { generateProjectPlan } from '../services/planningService.js';
@@ -78,10 +79,15 @@ const ResultsView = ({ plan }) => {
 
 const InputView = ({ onGenerate, isLoading, error }) => {
     const [objective, setObjective] = useState('');
+    const [budget, setBudget] = useState('');
+    const [currency, setCurrency] = useState('USD');
+    const [duration, setDuration] = useState('');
+
+    const currencies = ["USD", "EUR", "GBP", "SAR", "AED", "EGP", "KWD", "QAR", "OMR", "BHD", "INR", "CNY", "JPY"];
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onGenerate(objective);
+        onGenerate(objective, budget, currency, duration);
     };
     
     return React.createElement('div', { className: 'w-full max-w-2xl text-center animate-fade-in-up' },
@@ -90,14 +96,49 @@ const InputView = ({ onGenerate, isLoading, error }) => {
         React.createElement('p', { className: 'text-brand-text-light mb-6' }, "Provide your high-level project objective below. Our AI will generate a comprehensive plan, schedule, budget, and more."),
         error && React.createElement('div', { className: "bg-red-500/10 border border-red-500/30 text-center p-2 rounded-md mb-4 text-sm text-red-400 font-semibold" }, error),
         React.createElement('form', { onSubmit: handleSubmit, className: 'space-y-4 text-left' },
-            React.createElement('textarea', {
-                value: objective,
-                onChange: e => setObjective(e.target.value),
-                placeholder: "e.g., Launch a marketing campaign for our new Q4 product release...",
-                rows: 4,
-                className: "w-full p-3 bg-dark-card-solid border border-dark-border rounded-lg focus:ring-2 focus:ring-brand-purple focus:outline-none resize-none text-white placeholder-slate-500",
-                disabled: isLoading
-            }),
+             React.createElement('div', null,
+                React.createElement('label', { className: 'block text-sm font-medium text-brand-text-light mb-1' }, "Project Objective / Scope"),
+                React.createElement('textarea', {
+                    value: objective,
+                    onChange: e => setObjective(e.target.value),
+                    placeholder: "e.g., Launch a marketing campaign for our new Q4 product release...",
+                    rows: 4,
+                    className: "w-full p-3 bg-dark-card-solid border border-dark-border rounded-lg focus:ring-2 focus:ring-brand-purple focus:outline-none resize-none text-white placeholder-slate-500",
+                    disabled: isLoading
+                })
+             ),
+             React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4' },
+                 React.createElement('div', null,
+                    React.createElement('label', { className: 'block text-sm font-medium text-brand-text-light mb-1' }, "Total Budget (Optional)"),
+                    React.createElement('div', { className: 'flex gap-2' },
+                        React.createElement('input', {
+                            type: 'number',
+                            value: budget,
+                            onChange: e => setBudget(e.target.value),
+                            placeholder: "e.g. 50000",
+                            className: "w-full p-3 bg-dark-card-solid border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none",
+                            disabled: isLoading
+                        }),
+                        React.createElement('select', {
+                            value: currency,
+                            onChange: e => setCurrency(e.target.value),
+                            className: 'w-24 p-3 bg-dark-card-solid border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none font-bold',
+                            disabled: isLoading
+                        }, currencies.map(c => React.createElement('option', { key: c, value: c }, c)))
+                    )
+                 ),
+                 React.createElement('div', null,
+                    React.createElement('label', { className: 'block text-sm font-medium text-brand-text-light mb-1' }, "Duration (Optional)"),
+                    React.createElement('input', {
+                        type: 'text',
+                        value: duration,
+                        onChange: e => setDuration(e.target.value),
+                        placeholder: "e.g. 6 months",
+                        className: "w-full p-3 bg-dark-card-solid border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none",
+                        disabled: isLoading
+                    })
+                 )
+             ),
             React.createElement('button', {
                 type: 'submit',
                 disabled: isLoading || !objective.trim(),
@@ -122,7 +163,7 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
     const handleToggleEdit = () => setIsEditing(prev => !prev);
     const handleExport = () => window.print();
 
-    // Effect to auto-generate plan when objective is set
+    // Effect to auto-generate plan when objective is set (if coming from Consulting Plan)
     useEffect(() => {
         if (projectData.objective && !projectData.plan && !isLoading) {
             const generate = async () => {
@@ -147,7 +188,14 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
     const renderContent = () => {
         if (!projectData.objective) {
             return React.createElement(InputView, {
-                onGenerate: (objective) => onUpdateProject({ objective }),
+                onGenerate: (objective, budget, currency, duration) => {
+                    // Combine constraints into objective string if needed, or pass them. 
+                    // For simplicity, we append constraints to objective to influence WBS.
+                    let enhancedObjective = objective;
+                    if (budget) enhancedObjective += ` Budget Limit: ${currency} ${budget}.`;
+                    if (duration) enhancedObjective += ` Duration: ${duration}.`;
+                    onUpdateProject({ objective: enhancedObjective });
+                },
                 isLoading,
                 error
             });
@@ -174,7 +222,7 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
        React.createElement('div', { className: 'flex-grow min-h-0 overflow-y-auto' },
            React.createElement('div', {
                ref: contentRef,
-               className: 'p-6 printable-content min-h-full w-full',
+               className: 'p-6 printable-content w-full pb-32', // Added pb-32 for extra scroll space and removed min-h-full to prevent clipping with transform
                style: { transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.2s ease' },
                contentEditable: isEditing,
                suppressContentEditableWarning: true
