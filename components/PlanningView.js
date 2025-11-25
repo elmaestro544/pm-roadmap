@@ -174,14 +174,14 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
                     onUpdateProject({ plan });
                 } catch (err) {
                     setError(err.message || 'An unexpected error occurred.');
-                    onResetProject(); // Reset if planning fails, as it's the first step
+                    // Don't auto-reset completely, let user see error and maybe try again or edit objective
                 } finally {
                     setIsLoading(false);
                 }
             };
             generate();
         }
-    }, [projectData.objective, projectData.plan, isLoading, onUpdateProject, setIsLoading, setError, onResetProject]);
+    }, [projectData.objective, projectData.plan, isLoading, onUpdateProject, setIsLoading, setError]);
 
     const hasPlan = !!projectData.plan;
 
@@ -206,7 +206,17 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
         if (projectData.plan) {
             return React.createElement(ResultsView, { plan: projectData.plan });
         }
-        return React.createElement(LoadingView, null); 
+        // Fallback for error state where objective exists but plan failed
+        return React.createElement(InputView, {
+             onGenerate: (objective, budget, currency, duration) => {
+                 let enhancedObjective = objective;
+                 if (budget) enhancedObjective += ` Budget Limit: ${currency} ${budget}.`;
+                 if (duration) enhancedObjective += ` Duration: ${duration}.`;
+                 onUpdateProject({ objective: enhancedObjective });
+             },
+             isLoading,
+             error
+         });
     };
     
     return React.createElement('div', { ref: fullscreenRef, className: "h-full flex flex-col text-white bg-dark-card printable-container" },
@@ -222,8 +232,10 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
        React.createElement('div', { className: 'flex-grow min-h-0 overflow-y-auto' },
            React.createElement('div', {
                ref: contentRef,
-               className: 'p-6 printable-content w-full pb-32', // Added pb-32 for extra scroll space and removed min-h-full to prevent clipping with transform
-               style: { transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.2s ease' },
+               className: 'p-6 printable-content w-full pb-32', 
+               // transform-origin: top center prevents it from flying off when zoomed
+               // width: 100% ensures it takes full width
+               style: { transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.2s ease', width: '100%' },
                contentEditable: isEditing,
                suppressContentEditableWarning: true
            },

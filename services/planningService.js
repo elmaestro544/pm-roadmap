@@ -60,14 +60,17 @@ export const generateProjectPlan = async (objective) => {
     4. Each main task MUST have subtasks.
     5. Define at least 3-4 key milestones.
     6. Ensure the durations and assignee counts are realistic estimates based on the objective.
+    7. Return ONLY valid JSON matching the schema, do not include any markdown formatting.
     
     The output must be valid JSON matching the schema.`;
 
-    const systemInstruction = "You are an expert AI Project Manager. Break down objectives into WBS and Milestones.";
+    const systemInstruction = "You are an expert AI Project Manager. Break down objectives into WBS and Milestones. Always return pure JSON.";
 
     try {
         const jsonText = await generateAIContent(prompt, projectPlanSchema, systemInstruction);
-        const parsed = JSON.parse(jsonText.trim());
+        // Robust cleanup: remove any Markdown code blocks that might sneak in
+        const cleanedText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanedText);
         
         // Basic validation to prevent "missing data" issues if AI returns empty arrays
         if (!parsed.workBreakdownStructure || parsed.workBreakdownStructure.length === 0) {
