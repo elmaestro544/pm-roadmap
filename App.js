@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { AppView, Language, i18n } from './constants.js';
 import Home from './components/Home.js';
@@ -49,6 +48,20 @@ const WelcomeModal = ({ isOpen, onClose, onAuthClick, language }) => {
         )
     );
 };
+
+// System Warning Banner (New)
+const SystemWarning = ({ message, actionLabel, onAction }) => (
+    React.createElement('div', { className: "bg-red-500/10 border-b border-red-500/20 text-red-200 px-4 py-2 text-sm flex items-center justify-between" },
+        React.createElement('div', { className: "flex items-center gap-2" },
+            React.createElement('span', { className: "text-xl" }, "⚠️"),
+            React.createElement('span', null, message)
+        ),
+        onAction && React.createElement('button', { 
+            onClick: onAction,
+            className: "text-white underline hover:text-red-100 text-xs font-semibold"
+        }, actionLabel)
+    )
+);
 
 
 // Header Component
@@ -257,7 +270,6 @@ const Footer = ({ language, setView, contactEmail, onAdminClick }) => {
 const App = () => {
   const [view, setView] = useState(AppView.Home);
   const [language, setLanguage] = useState(Language.EN);
-  const [apiKeyError, setApiKeyError] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAuthModalAdminMode, setIsAuthModalAdminMode] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -309,12 +321,9 @@ const App = () => {
   
   // Auth & Init
   useEffect(() => {
-    if (!isAnyModelConfigured()) {
-        setApiKeyError(true);
-    }
-
     if (!supabase) {
         setIsAuthChecking(false);
+        // We allow running without Supabase, just some features might break.
         return;
     }
 
@@ -469,7 +478,24 @@ const App = () => {
     }
   };
 
+  const apiKeyMissing = !isAnyModelConfigured();
+  const supabaseMissing = !supabase;
+
   return React.createElement('div', { className: "min-h-screen flex flex-col font-sans" },
+    // System Warnings
+    (apiKeyMissing || supabaseMissing) && React.createElement('div', { className: "sticky top-0 z-[60]" },
+        apiKeyMissing && React.createElement(SystemWarning, { 
+            message: "API Key missing. AI features are disabled.", 
+            actionLabel: "Configure in Admin",
+            onAction: handleAdminAccess
+        }),
+        supabaseMissing && React.createElement(SystemWarning, { 
+            message: "Supabase not configured. Auth & Cloud Save disabled.", 
+            actionLabel: "Check Deployment",
+            onAction: null // No direct action for supabase missing in runtime usually
+        })
+    ),
+
     React.createElement(Header, {
       currentView: view,
       setView: setView,
@@ -496,18 +522,11 @@ const App = () => {
       onLogout: handleLogout,
       onAdminClick: handleAdminAccess
     }),
+    
     React.createElement('main', { className: "flex-grow flex flex-col" },
-      apiKeyError ? (
-        React.createElement('div', { className: "container mx-auto p-4 md:p-8 flex flex-col items-center justify-center h-full text-center" },
-          React.createElement('div', { className: "bg-dark-card border border-red-500/50 p-8 rounded-2xl max-w-md shadow-lg glow-border" },
-            React.createElement('h2', { className: "text-2xl font-bold text-red-500 mb-4" }, "API Key Error"),
-            React.createElement('p', { className: "text-brand-text-light" }, "API Key is not configured. Please check your env.js file.")
-          )
-        )
-      ) : (
         renderView()
-      )
     ),
+
     (view !== AppView.Dashboard && view !== AppView.Admin && view !== AppView.Settings && view !== AppView.Projects) && React.createElement(Footer, { 
         language: language, 
         setView: setView, 

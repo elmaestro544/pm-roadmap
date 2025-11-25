@@ -4,7 +4,7 @@
   "description": "AI-Powered Project Management Dashboard",
   "main": "index.js",
   "scripts": {
-    "build": "node generate_env.js",
+    "build": "echo 'Runtime env.js ready for injection'",
     "start": "npx serve -s ."
   },
   "keywords": [

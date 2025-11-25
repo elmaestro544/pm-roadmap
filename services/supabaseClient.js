@@ -21,8 +21,13 @@ export const getEnv = (key) => {
 
     // 3. Check window/runtime injection (Legacy env.js or Docker entrypoint scripts)
     try {
-        if (typeof window !== 'undefined') {
-            if (window.process?.env?.[key]) return window.process.env[key];
+        if (typeof window !== 'undefined' && window.process?.env) {
+            // Direct match
+            if (window.process.env[key]) return window.process.env[key];
+            // Check for VITE_ prefix match in window.process.env
+            if (window.process.env[`VITE_${key}`]) return window.process.env[`VITE_${key}`];
+            
+            // Check legacy _env_ object
             if (window._env_?.[key]) return window._env_[key];
         }
     } catch (e) {}
@@ -33,9 +38,15 @@ export const getEnv = (key) => {
 const supabaseUrl = getEnv('SUPABASE_URL');
 const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY');
 
-const isValidSupabaseConfig = () => 
-    supabaseUrl && supabaseUrl !== 'YOUR_SUPABASE_URL_HERE' && 
-    supabaseAnonKey && supabaseAnonKey !== 'YOUR_SUPABASE_ANON_KEY_HERE';
+// Helper to check if the value is a placeholder or valid
+const isValidConfig = (value) => {
+    return value && 
+           value !== 'YOUR_SUPABASE_URL_HERE' && 
+           value !== 'YOUR_SUPABASE_ANON_KEY_HERE' &&
+           !value.startsWith('__VITE_'); // Check if it's still a placeholder
+};
+
+const isValidSupabaseConfig = () => isValidConfig(supabaseUrl) && isValidConfig(supabaseAnonKey);
 
 // Explicitly enable session persistence in localStorage
 export const supabase = isValidSupabaseConfig() 
