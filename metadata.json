@@ -1,7 +1,0 @@
-{
-  "name": "pm-roadmap",
-  "description": "A sophisticated, bilingual (English/Arabic) web application for AI-powered project and construction management. It helps teams collaborate and work together efficiently by providing tools for planning, scheduling, risk control, and budget management.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}
