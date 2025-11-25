@@ -14,7 +14,7 @@ import StructureView from './StructureView.js';
 import KpiView from './KpiView.js';
 import SCurveView from './SCurveView.js';
 import ComprehensivePlanView from './ComprehensivePlanView.js';
-import { UserIcon, SidebarToggleIcon, Logo, Spinner, HistoryIcon, PlusIcon } from './Shared.js';
+import { UserIcon, SidebarToggleIcon, Logo, Spinner, HistoryIcon, PlusIcon, ChevronRightIcon } from './Shared.js';
 import { getUserProjects, getProjectDetails, saveProject } from '../services/supabaseClient.js';
 
 // Updated workflow order to match DASHBOARD_VIEWS in constants.js
@@ -48,12 +48,20 @@ const PrerequisiteView = ({ missing, language, onViewChange }) => {
     );
 };
 
-const ProjectHeader = ({ language, objective, onReset, onNext, onPrev, activeView }) => {
+const ProjectHeader = ({ language, objective, onReset, onNext, onPrev, activeView, onBackToProjects, projectTitle }) => {
     const t = i18n[language];
     return React.createElement('div', { className: 'non-printable flex-shrink-0 h-16 flex items-center justify-between px-6 border-b border-dark-border bg-dark-card/50' },
         React.createElement('div', { className: 'flex-grow min-w-0 mr-4' },
-            React.createElement('h2', { className: 'text-xs font-semibold text-brand-text-light uppercase tracking-wider' }, 'Current Project Scope'),
-            React.createElement('p', { className: 'text-white truncate font-semibold text-sm', title: objective }, objective || "Start by creating a Project Plan")
+            // Breadcrumbs
+            React.createElement('div', { className: 'flex items-center gap-2 text-xs font-semibold text-brand-text-light mb-1' },
+                React.createElement('button', { onClick: onBackToProjects, className: 'hover:text-white transition-colors' }, "Main"),
+                React.createElement(ChevronRightIcon, { className: 'w-3 h-3' }),
+                React.createElement('button', { onClick: onBackToProjects, className: 'hover:text-white transition-colors' }, "Projects"),
+                React.createElement(ChevronRightIcon, { className: 'w-3 h-3' }),
+                React.createElement('span', { className: 'text-brand-purple-light truncate max-w-[200px]' }, projectTitle || "New Project")
+            ),
+            // Objective Preview
+            React.createElement('p', { className: 'text-white truncate font-semibold text-sm opacity-80', title: objective }, objective || "Drafting Phase")
         ),
         React.createElement('div', { className: 'flex items-center gap-2 flex-shrink-0' },
             React.createElement('button', { onClick: onPrev, disabled: WORKFLOW_ORDER.indexOf(activeView) === 0, className: 'p-2 rounded-md text-brand-text-light hover:bg-white/10 hover:text-white disabled:opacity-50' }, '‹ Prev'),
@@ -63,21 +71,6 @@ const ProjectHeader = ({ language, objective, onReset, onNext, onPrev, activeVie
         )
     );
 };
-
-const ProjectHistoryList = ({ onSelectProject, projects, language }) => {
-    return React.createElement('div', { className: 'p-4 border-t border-dark-border overflow-y-auto max-h-48' },
-        React.createElement('h4', { className: 'text-xs font-semibold text-brand-text-light uppercase tracking-wider mb-2' }, "Your Projects"),
-        projects.length === 0 ? React.createElement('p', { className: 'text-xs text-slate-500' }, "No saved projects") : 
-        projects.map(p => React.createElement('button', {
-            key: p.id,
-            onClick: () => onSelectProject(p.id),
-            className: 'w-full text-left p-2 rounded-md hover:bg-white/5 mb-1 group transition-colors'
-        },
-            React.createElement('p', { className: 'text-sm font-medium text-white truncate' }, p.title || "Untitled Project"),
-            React.createElement('p', { className: 'text-xs text-slate-500' }, new Date(p.updated_at).toLocaleDateString())
-        ))
-    );
-}
 
 const Sidebar = ({ language, activeView, setActiveView, isExpanded, setExpanded, onLogout, currentUser, projectData, onSelectProject, projects }) => {
     const t = i18n[language];
@@ -128,8 +121,6 @@ const Sidebar = ({ language, activeView, setActiveView, isExpanded, setExpanded,
             })
         ),
         
-        isExpanded && React.createElement(ProjectHistoryList, { projects, onSelectProject, language }),
-
         React.createElement('div', { className: 'p-4 border-t border-dark-border' },
             React.createElement('button', {
                 onClick: () => setExpanded(!isExpanded),
@@ -144,12 +135,12 @@ const Sidebar = ({ language, activeView, setActiveView, isExpanded, setExpanded,
 };
 
 
-const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick }) => {
+const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick, initialProjectId, onBackToProjects }) => {
   const [activeView, setActiveView] = useState('consultingPlan');
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [projectData, setProjectData] = useState({});
-  const [currentProjectId, setCurrentProjectId] = useState(null);
-  const [userProjects, setUserProjects] = useState([]);
+  const [currentProjectId, setCurrentProjectId] = useState(initialProjectId);
+  const [projectTitle, setProjectTitle] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -159,44 +150,45 @@ const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick }) =
       return React.createElement('div', {className: 'container mx-auto p-4 md:p-8'}, React.createElement(AuthRequired, { language, onLoginClick }));
   }
 
-  // Fetch list of projects on load
+  // Load specific project if initialProjectId provided or changed
   useEffect(() => {
-    const fetchProjects = async () => {
-        if (currentUser?.id) { // Only fetch if we have a valid user ID
-            const projects = await getUserProjects();
-            setUserProjects(projects);
-        }
-    };
-    fetchProjects();
-  }, [currentUser?.id, currentProjectId]); // Re-fetch when user ID changes (login) or project changes
-
-  // Load a specific project
-  const handleSelectProject = async (projectId) => {
-    setIsLoading(true);
-    try {
-        const data = await getProjectDetails(projectId);
-        if (data) {
-            setProjectData({
-                objective: data.objective,
-                plan: data.plan,
-                schedule: data.schedule,
-                risk: data.risks,
-                budget: data.budget,
-                structure: data.structure, 
-                kpiReport: data.kpis,
-                sCurveReport: data.s_curve,
-                consultingPlan: data.consulting_plan,
-                agents: data.agents
-            });
-            setCurrentProjectId(data.id);
+    const loadProject = async () => {
+        if (initialProjectId) {
+            setIsLoading(true);
+            try {
+                const data = await getProjectDetails(initialProjectId);
+                if (data) {
+                    setProjectData({
+                        objective: data.objective,
+                        plan: data.plan,
+                        schedule: data.schedule,
+                        risk: data.risks,
+                        budget: data.budget,
+                        structure: data.structure, 
+                        kpiReport: data.kpis,
+                        sCurveReport: data.s_curve,
+                        consultingPlan: data.consulting_plan,
+                        agents: data.agents
+                    });
+                    setCurrentProjectId(data.id);
+                    setProjectTitle(data.title);
+                    setActiveView('consultingPlan');
+                }
+            } catch (e) {
+                setError("Failed to load project");
+            } finally {
+                setIsLoading(false);
+            }
+        } else {
+            // Reset if no ID (New Project mode)
+            setProjectData({});
+            setCurrentProjectId(null);
+            setProjectTitle("");
             setActiveView('consultingPlan');
         }
-    } catch (e) {
-        setError("Failed to load project");
-    } finally {
-        setIsLoading(false);
-    }
-  };
+    };
+    loadProject();
+  }, [initialProjectId]);
 
   const handleUpdateProject = async (newData) => {
     const updatedData = { ...projectData, ...newData };
@@ -207,19 +199,20 @@ const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick }) =
         // Only save if there's substantial data (objective or consulting plan title)
         if (updatedData.objective || updatedData.consultingPlan?.projectTitle) {
             const savedProject = await saveProject(currentProjectId, updatedData);
-            if (savedProject && !currentProjectId) {
+            if (savedProject) {
                 setCurrentProjectId(savedProject.id);
+                setProjectTitle(savedProject.title);
             }
         }
     } catch (e) {
         console.error("Auto-save failed:", e);
-        // Don't block UI on save fail, just log
     }
   };
 
   const handleResetProject = () => {
     setProjectData({});
     setCurrentProjectId(null);
+    setProjectTitle("");
     setActiveView('consultingPlan');
     setError(null);
   };
@@ -293,9 +286,7 @@ const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick }) =
         setExpanded: setIsSidebarExpanded, 
         onLogout, 
         currentUser, 
-        projectData,
-        projects: userProjects,
-        onSelectProject: handleSelectProject
+        projectData
     }),
     React.createElement('main', { className: 'flex-1 p-6 min-w-0 flex flex-col' },
         React.createElement(ProjectHeader, { 
@@ -304,7 +295,9 @@ const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick }) =
             onReset: handleResetProject,
             onNext: handleNext,
             onPrev: handlePrev,
-            activeView
+            activeView,
+            onBackToProjects,
+            projectTitle
         }),
         React.createElement('div', { className: "mt-6 flex-grow bg-dark-card backdrop-blur-xl rounded-2xl glow-border overflow-hidden" },
             error && !isLoading && React.createElement('div', { className: "bg-red-500/10 border-b border-red-500/30 text-center p-2 text-sm text-red-400 font-semibold" }, error),

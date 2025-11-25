@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { AppView, Language, i18n } from './constants.js';
 import Home from './components/Home.js';
@@ -8,9 +9,11 @@ import Contact from './components/Contact.js';
 import Pricing from './components/Pricing.js';
 import Terms from './components/Terms.js';
 import Privacy from './components/Privacy.js';
+import Workflow from './components/Workflow.js'; 
 import AdminDashboard from './components/AdminDashboard.js';
 import UserSettings from './components/UserSettings.js'; 
-import { UserIcon, Logo, MenuIcon, CloseIcon, FacebookIcon, LinkedinIcon, TelegramIcon, SettingsIcon, Spinner, LockIcon } from './components/Shared.js';
+import ProjectManager from './components/ProjectManager.js'; // New Component
+import { UserIcon, Logo, MenuIcon, CloseIcon, FacebookIcon, LinkedinIcon, TelegramIcon, SettingsIcon, Spinner, LockIcon, FolderIcon } from './components/Shared.js';
 import { isAnyModelConfigured } from './services/geminiService.js';
 import AuthModal from './components/AuthModal.js';
 import { supabase, getCurrentUser, signOut } from './services/supabaseClient.js';
@@ -53,10 +56,10 @@ const Header = ({ currentView, setView, language, setLanguage, isAuthenticated, 
   const t = i18n[language];
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
+  // Updated Navigation: Replaced Features/Industries with Workflow
   const navLinks = [
     { view: AppView.Home, label: t.navHome, isPage: true },
-    { view: 'features', label: t.navFeatures, isPage: false },
-    { view: 'industries', label: t.navIndustries, isPage: false },
+    { view: AppView.Workflow, label: t.navWorkflow, isPage: true },
     { view: AppView.Pricing, label: t.navPricing, isPage: true },
     { view: AppView.Contact, label: t.navContact, isPage: true },
   ];
@@ -65,14 +68,8 @@ const Header = ({ currentView, setView, language, setLanguage, isAuthenticated, 
       if (link.isPage) {
           setView(link.view);
       } else {
-          if (currentView !== AppView.Home) {
-              setView(AppView.Home);
-              setTimeout(() => {
-                  document.getElementById(link.view)?.scrollIntoView({ behavior: 'smooth' });
-              }, 100);
-          } else {
-              document.getElementById(link.view)?.scrollIntoView({ behavior: 'smooth' });
-          }
+          // Fallback for anchors if needed
+          document.getElementById(link.view)?.scrollIntoView({ behavior: 'smooth' });
       }
   };
 
@@ -114,6 +111,10 @@ const Header = ({ currentView, setView, language, setLanguage, isAuthenticated, 
                     className: "absolute top-full right-0 mt-2 w-48 bg-dark-card-solid border border-dark-border rounded-lg shadow-xl py-2 z-50 animate-fade-in-up"
                 },
                     React.createElement('button', {
+                         onClick: () => { setView(AppView.Projects); setIsUserMenuOpen(false); },
+                         className: "w-full text-left px-4 py-2 text-sm text-brand-text-light hover:bg-white/10 hover:text-white flex items-center gap-2"
+                    }, React.createElement(FolderIcon, { className: "w-4 h-4" }), t.navProjects),
+                    React.createElement('button', {
                          onClick: () => { setView(AppView.Settings); setIsUserMenuOpen(false); },
                          className: "w-full text-left px-4 py-2 text-sm text-brand-text-light hover:bg-white/10 hover:text-white flex items-center gap-2"
                     }, React.createElement(SettingsIcon, { className: "w-4 h-4" }), t.navSettings),
@@ -149,10 +150,10 @@ const MobileMenu = ({ isOpen, onClose, currentView, setView, language, setLangua
     if (!isOpen) return null;
     const t = i18n[language];
     
+    // Updated Links for Mobile
     const navLinks = [
         { view: AppView.Home, label: t.navHome, isPage: true },
-        { view: 'features', label: t.navFeatures, isPage: false },
-        { view: 'industries', label: t.navIndustries, isPage: false },
+        { view: AppView.Workflow, label: t.navWorkflow, isPage: true },
         { view: AppView.Pricing, label: t.navPricing, isPage: true },
         { view: AppView.Contact, label: t.navContact, isPage: true },
     ];
@@ -161,12 +162,7 @@ const MobileMenu = ({ isOpen, onClose, currentView, setView, language, setLangua
         if (link.isPage) {
           setView(link.view);
         } else {
-           if (currentView !== AppView.Home) {
-              setView(AppView.Home);
-              setTimeout(() => document.getElementById(link.view)?.scrollIntoView({ behavior: 'smooth' }), 100);
-          } else {
-              document.getElementById(link.view)?.scrollIntoView({ behavior: 'smooth' });
-          }
+            document.getElementById(link.view)?.scrollIntoView({ behavior: 'smooth' });
         }
         onClose();
     };
@@ -188,6 +184,10 @@ const MobileMenu = ({ isOpen, onClose, currentView, setView, language, setLangua
                     }, link.label)
                 ),
                  isAuthenticated && React.createElement('button', {
+                    onClick: () => { setView(AppView.Projects); onClose(); },
+                    className: `w-full text-lg py-3 rounded-md hover:bg-dark-card-solid text-brand-text-light`
+                }, t.navProjects),
+                 isAuthenticated && React.createElement('button', {
                     onClick: () => { setView(AppView.Settings); onClose(); },
                     className: `w-full text-lg py-3 rounded-md hover:bg-dark-card-solid text-brand-text-light`
                 }, t.navSettings),
@@ -205,7 +205,7 @@ const MobileMenu = ({ isOpen, onClose, currentView, setView, language, setLangua
     );
 };
 
-// Footer
+// Footer (Unchanged, mostly)
 const Footer = ({ language, setView, contactEmail, onAdminClick }) => {
   const t = i18n[language];
   const SocialIcon = ({ href, children }) => React.createElement('a', { href, target: "_blank", rel: "noopener noreferrer", className: "w-10 h-10 flex items-center justify-center rounded-full bg-dark-card-solid hover:bg-brand-purple text-white transition-colors" }, children);
@@ -222,8 +222,8 @@ const Footer = ({ language, setView, contactEmail, onAdminClick }) => {
         React.createElement('div', null,
           React.createElement('h3', { className: "font-bold text-lg text-white mb-4" }, "Links"),
           React.createElement('ul', { className: "space-y-3" },
-            React.createElement('li', null, React.createElement('button', { onClick: () => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' }), className: "text-brand-text-light hover:text-brand-purple-light transition-colors" }, t.navFeatures)),
-            React.createElement('li', null, React.createElement('button', { onClick: () => document.getElementById('industries')?.scrollIntoView({ behavior: 'smooth' }), className: "text-brand-text-light hover:text-brand-purple-light transition-colors" }, t.navIndustries)),
+            // Updated Footer Links
+            React.createElement('li', null, React.createElement('button', { onClick: () => setView(AppView.Workflow), className: "text-brand-text-light hover:text-brand-purple-light transition-colors" }, t.navWorkflow)),
             React.createElement('li', null, React.createElement('button', { onClick: () => setView(AppView.Contact), className: "text-brand-text-light hover:text-brand-purple-light transition-colors" }, t.navContact)),
             React.createElement('li', null, React.createElement('button', { onClick: onAdminClick, className: "text-brand-text-light hover:text-brand-purple-light transition-colors" }, t.navAdmin))
           )
@@ -265,6 +265,7 @@ const App = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
   const [theme, setTheme] = useState('dark');
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
   
   // Admin Logic
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
@@ -277,14 +278,14 @@ const App = () => {
             bgIntensity: 0.6,
             showCityscape: true,
             contactEmail: 'info@roadmap.casa',
-            contactPhone: '+1 (555) 123-4567'
+            contactPhone: '+966-54 239 8764'
         };
       } catch (e) {
         return {
             bgIntensity: 0.6,
             showCityscape: true,
             contactEmail: 'info@roadmap.casa',
-            contactPhone: '+1 (555) 123-4567'
+            contactPhone: '+966-54 239 8764'
         };
       }
   });
@@ -319,10 +320,8 @@ const App = () => {
 
     let mounted = true;
 
-    // Strict sequential auth initialization
     const initializeAuth = async () => {
         try {
-            // 1. Check initial session
             const user = await getCurrentUser();
             
             if (mounted) {
@@ -332,18 +331,15 @@ const App = () => {
                 setIsAuthChecking(false);
             }
 
-            // 2. Subscribe to changes *after* initial check
             const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
                 if (!mounted) return;
                 
-                // IGNORE INITIAL_SESSION because we handled it above manually
                 if (event === 'INITIAL_SESSION') return;
 
                 if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
                     const updatedUser = await getCurrentUser();
                     if (mounted) {
                          setCurrentUser(updatedUser);
-                         // Only redirect to dashboard on explicit sign in, not refresh
                          if (event === 'SIGNED_IN') setView(AppView.Dashboard);
                     }
                 } 
@@ -367,7 +363,6 @@ const App = () => {
 
     const unsubscribePromise = initializeAuth();
 
-    // Welcome modal check
     const hasSeenWelcome = sessionStorage.getItem('hasSeenWelcomeModal');
     if (!hasSeenWelcome) {
         setIsWelcomeModalOpen(true);
@@ -387,14 +382,12 @@ const App = () => {
     } catch(e) {
         console.error("Sign out error", e);
     } finally {
-        // Force local state clear regardless of network result
         setCurrentUser(null);
         setView(AppView.Home);
     }
   };
 
   const handleLoginSuccess = async () => {
-      // Small delay to allow session to propagate locally
       setIsAuthChecking(true);
       const user = await getCurrentUser();
       setCurrentUser(user);
@@ -418,6 +411,17 @@ const App = () => {
       setView(AppView.Admin);
   };
 
+  // Project Manager Handlers
+  const handleOpenProject = (projectId) => {
+      setSelectedProjectId(projectId);
+      setView(AppView.Dashboard);
+  };
+
+  const handleNewProject = () => {
+      setSelectedProjectId(null); // Clear selection to trigger new project state in Dashboard
+      setView(AppView.Dashboard);
+  };
+
   if (isAuthChecking) {
       return React.createElement('div', { className: "min-h-screen flex items-center justify-center bg-dark-bg text-white" },
         React.createElement(Spinner, { size: "12" })
@@ -430,8 +434,21 @@ const App = () => {
     switch (view) {
       case AppView.Home: 
         return React.createElement(Home, { ...props, settings: adminSettings });
+      case AppView.Workflow:
+        return React.createElement(Workflow, props);
       case AppView.Dashboard: 
-        return React.createElement(Dashboard, { ...props, onLogout: handleLogout });
+        return React.createElement(Dashboard, { 
+            ...props, 
+            onLogout: handleLogout, 
+            initialProjectId: selectedProjectId,
+            onBackToProjects: () => setView(AppView.Projects)
+        });
+      case AppView.Projects:
+          return React.createElement(ProjectManager, {
+              currentUser,
+              onSelectProject: handleOpenProject,
+              onNewProject: handleNewProject
+          });
       case AppView.Admin:
          return React.createElement(AdminDashboard, { 
              language, 
@@ -479,7 +496,7 @@ const App = () => {
       onLogout: handleLogout,
       onAdminClick: handleAdminAccess
     }),
-    React.createElement('main', { className: "flex-grow" },
+    React.createElement('main', { className: "flex-grow flex flex-col" },
       apiKeyError ? (
         React.createElement('div', { className: "container mx-auto p-4 md:p-8 flex flex-col items-center justify-center h-full text-center" },
           React.createElement('div', { className: "bg-dark-card border border-red-500/50 p-8 rounded-2xl max-w-md shadow-lg glow-border" },
@@ -491,7 +508,7 @@ const App = () => {
         renderView()
       )
     ),
-    (view !== AppView.Dashboard && view !== AppView.Admin && view !== AppView.Settings) && React.createElement(Footer, { 
+    (view !== AppView.Dashboard && view !== AppView.Admin && view !== AppView.Settings && view !== AppView.Projects) && React.createElement(Footer, { 
         language: language, 
         setView: setView, 
         contactEmail: adminSettings.contactEmail,

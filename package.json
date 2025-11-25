@@ -1,23 +1,21 @@
 {
   "name": "pm-roadmap",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "version": "1.0.0",
+  "description": "AI-Powered Project Management Dashboard",
+  "main": "index.js",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build": "node generate_env.js",
+    "start": "npx serve -s ."
   },
+  "keywords": [
+    "ai",
+    "project-management",
+    "gemini",
+    "supabase"
+  ],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "@google/genai": "latest",
-    "@supabase/supabase-js": "2.39.8",
-    "react": "18.2.0",
-    "react-dom": "^19.2.0"
-  },
-  "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "serve": "^14.2.1"
   }
 }

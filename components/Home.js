@@ -237,8 +237,8 @@ const Home = ({ language, setView, settings }) => {
         { 
             id: 'planning', 
             icon: PlanningIcon, 
-            title: t.whyChoose1Title, 
-            desc: t.whyChoose1Desc,
+            title: t.capability1Title, 
+            desc: t.capability1Desc,
             image: 'https://images.pexels.com/photos/3184418/pexels-photo-3184418.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
         },
         { 
@@ -251,15 +251,15 @@ const Home = ({ language, setView, settings }) => {
         { 
             id: 'risk', 
             icon: RiskIcon, 
-            title: t.whyChoose2Title, 
-            desc: t.whyChoose2Desc,
+            title: t.capability3Title, 
+            desc: t.capability3Desc,
             image: 'https://images.pexels.com/photos/3183150/pexels-photo-3183150.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
         },
         { 
             id: 'budget', 
             icon: BudgetIcon, 
-            title: t.whyChoose3Title, 
-            desc: t.whyChoose3Desc,
+            title: t.capability4Title, 
+            desc: t.capability4Desc,
             image: 'https://images.pexels.com/photos/590022/pexels-photo-590022.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
         },
     ];
@@ -382,17 +382,17 @@ const Home = ({ language, setView, settings }) => {
 
     const CapabilitiesSection = () => {
         const capabilities = [
-            { icon: PlanningIcon, title: t.whyChoose1Title, desc: t.whyChoose1Desc },
+            { icon: PlanningIcon, title: t.capability1Title, desc: t.capability1Desc },
             { icon: ScheduleIcon, title: t.capability2Title, desc: t.capability2Desc },
-            { icon: RiskIcon, title: t.capability4Title, desc: t.capability4Desc },
-            { icon: BudgetIcon, title: t.capability5Title, desc: t.capability5Desc },
+            { icon: RiskIcon, title: t.capability3Title, desc: t.capability3Desc },
+            { icon: BudgetIcon, title: t.capability4Title, desc: t.capability4Desc },
         ];
 
         return React.createElement('section', { id: 'features', className: 'py-16 md:py-24' },
             React.createElement('div', { className: 'container mx-auto px-6' },
                 React.createElement('div', { className: 'text-center max-w-3xl mx-auto mb-12' },
                     React.createElement('h2', { className: 'text-3xl md:text-4xl font-bold text-white' }, t.capabilitiesTitle),
-                    React.createElement('p', { className: 'mt-4 text-lg text-brand-text-light' }, t.capabilitiesDescription)
+                    React.createElement('p', { className: 'mt-4 text-lg text-brand-text-light' }, t.capabilitiesSubtitle)
                 ),
                 React.createElement('div', { className: 'grid md:grid-cols-2 lg:grid-cols-4 gap-8' },
                     capabilities.map((feature, index) =>
@@ -420,7 +420,7 @@ const Home = ({ language, setView, settings }) => {
             React.createElement('div', { className: 'container mx-auto px-6' },
                 React.createElement('div', { className: 'text-center max-w-3xl mx-auto mb-12' },
                     React.createElement('h2', { className: 'text-3xl md:text-4xl font-bold text-white' }, t.industriesTitle),
-                    React.createElement('p', { className: 'mt-4 text-lg text-brand-text-light' }, t.industriesDescription)
+                    React.createElement('p', { className: 'mt-4 text-lg text-brand-text-light' }, t.industriesSubtitle)
                 ),
                 React.createElement('div', { className: 'grid md:grid-cols-1 lg:grid-cols-3 gap-8' },
                     industries.map((industry, i) => 

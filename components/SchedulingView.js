@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { generateScheduleFromPlan } from '../services/schedulingService.js';
-import { ScheduleIcon, Spinner, FeatureToolbar } from './Shared.js';
+import { ScheduleIcon, Spinner, FeatureToolbar, BoardIcon, ListIcon, TimelineIcon } from './Shared.js';
 import { i18n } from '../constants.js';
 
 // --- Helper Functions ---
@@ -13,11 +14,10 @@ const addDays = (date, days) => {
 const getDaysDiff = (date1, date2) => {
     const d1 = new Date(date1);
     const d2 = new Date(date2);
-    // Set time to noon to avoid DST issues
     d1.setHours(12, 0, 0, 0);
     d2.setHours(12, 0, 0, 0);
     const diffTime = d2.getTime() - d1.getTime();
-    return Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1; // Inclusive of start/end day
+    return Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
 };
 
 
@@ -57,8 +57,7 @@ const GanttChart = ({ data, collapsed, setCollapsed, scale }) => {
 
         const topHeaders = [];
         const bottomHeaders = [];
-        let currentDate = new Date(projectStart);
-
+        
         if (scale === 'days') {
             let currentMonth = -1;
             for (let i = 0; i < totalDays; i++) {
@@ -87,7 +86,9 @@ const GanttChart = ({ data, collapsed, setCollapsed, scale }) => {
                 bottomHeaders.push({ label: `W${Math.floor(i/7) + 1}`, width });
                  if (weekStartDate.getMonth() !== currentMonth) {
                     currentMonth = weekStartDate.getMonth();
-                    //... logic to span months over weeks
+                    const monthName = weekStartDate.toLocaleString('default', { month: 'short', year: 'numeric' });
+                    const width = getDaysDiff(weekStartDate, new Date(weekStartDate.getFullYear(), weekStartDate.getMonth()+1, 0)) * dayPixelWidth;
+                    topHeaders.push({ label: monthName, width });
                 }
                 i += 7;
             }
@@ -102,7 +103,7 @@ const GanttChart = ({ data, collapsed, setCollapsed, scale }) => {
 
                  if (date.getFullYear() !== currentYear) {
                     currentYear = date.getFullYear();
-                    topHeaders.push({label: currentYear, width: 365 * dayPixelWidth}); // Approximate
+                    topHeaders.push({label: currentYear, width: 365 * dayPixelWidth}); 
                 }
                 date.setMonth(date.getMonth() + 1);
             }
@@ -232,12 +233,111 @@ const GanttChart = ({ data, collapsed, setCollapsed, scale }) => {
     );
 };
 
+const ListView = ({ data, onUpdateTask }) => {
+    return React.createElement('div', { className: 'w-full h-full bg-dark-card-solid rounded-lg overflow-auto animate-fade-in-up' },
+        React.createElement('table', { className: 'w-full text-sm text-left' },
+            React.createElement('thead', { className: 'text-xs text-brand-text-light uppercase bg-dark-bg sticky top-0 z-10' },
+                React.createElement('tr', null,
+                    React.createElement('th', { className: 'px-6 py-3' }, 'Task Name'),
+                    React.createElement('th', { className: 'px-6 py-3' }, 'Start Date'),
+                    React.createElement('th', { className: 'px-6 py-3' }, 'End Date'),
+                    React.createElement('th', { className: 'px-6 py-3' }, 'Progress'),
+                    React.createElement('th', { className: 'px-6 py-3' }, 'Type')
+                )
+            ),
+            React.createElement('tbody', null,
+                data.map((task) => (
+                    React.createElement('tr', { key: task.id, className: `border-b border-dark-border hover:bg-white/5 ${task.type === 'project' ? 'bg-white/5 font-semibold' : ''}` },
+                        React.createElement('td', { className: 'px-6 py-4' },
+                            React.createElement('input', {
+                                type: 'text',
+                                value: task.name,
+                                onChange: (e) => onUpdateTask(task.id, 'name', e.target.value),
+                                className: 'bg-transparent border-none focus:ring-0 w-full text-white'
+                            })
+                        ),
+                        React.createElement('td', { className: 'px-6 py-4' },
+                            React.createElement('input', {
+                                type: 'date',
+                                value: task.start,
+                                onChange: (e) => onUpdateTask(task.id, 'start', e.target.value),
+                                className: 'bg-transparent border border-dark-border rounded px-2 py-1 focus:ring-brand-purple text-brand-text-light'
+                            })
+                        ),
+                        React.createElement('td', { className: 'px-6 py-4' },
+                            React.createElement('input', {
+                                type: 'date',
+                                value: task.end,
+                                onChange: (e) => onUpdateTask(task.id, 'end', e.target.value),
+                                className: 'bg-transparent border border-dark-border rounded px-2 py-1 focus:ring-brand-purple text-brand-text-light'
+                            })
+                        ),
+                        React.createElement('td', { className: 'px-6 py-4 w-32' },
+                            React.createElement('div', { className: 'flex items-center gap-2' },
+                                React.createElement('input', {
+                                    type: 'number',
+                                    min: '0',
+                                    max: '100',
+                                    value: task.progress,
+                                    onChange: (e) => onUpdateTask(task.id, 'progress', parseInt(e.target.value)),
+                                    className: 'w-12 bg-transparent border border-dark-border rounded px-1 text-center text-white'
+                                }),
+                                React.createElement('span', { className: 'text-slate-500' }, '%')
+                            )
+                        ),
+                        React.createElement('td', { className: 'px-6 py-4 text-xs uppercase' },
+                            React.createElement('span', { className: `px-2 py-1 rounded ${task.type === 'project' ? 'bg-brand-purple/20 text-brand-purple-light' : 'bg-slate-700 text-slate-300'}` }, task.type)
+                        )
+                    )
+                ))
+            )
+        )
+    );
+};
+
+const BoardView = ({ data }) => {
+    // Filter out project phases, keep tasks
+    const tasks = data.filter(t => t.type !== 'project');
+    
+    const columns = {
+        todo: { title: 'To Do', tasks: tasks.filter(t => t.progress === 0) },
+        inProgress: { title: 'In Progress', tasks: tasks.filter(t => t.progress > 0 && t.progress < 100) },
+        done: { title: 'Done', tasks: tasks.filter(t => t.progress === 100) }
+    };
+
+    return React.createElement('div', { className: 'w-full h-full flex gap-4 overflow-x-auto pb-4 animate-fade-in-up' },
+        Object.entries(columns).map(([key, col]) => (
+            React.createElement('div', { key: key, className: 'min-w-[300px] w-1/3 bg-dark-card-solid rounded-xl border border-dark-border flex flex-col max-h-full' },
+                React.createElement('div', { className: 'p-4 border-b border-dark-border font-bold text-white flex justify-between' },
+                    col.title,
+                    React.createElement('span', { className: 'bg-white/10 px-2 rounded-full text-sm' }, col.tasks.length)
+                ),
+                React.createElement('div', { className: 'p-3 space-y-3 overflow-y-auto flex-grow' },
+                    col.tasks.map(task => (
+                        React.createElement('div', { key: task.id, className: 'bg-dark-bg p-3 rounded-lg border border-dark-border shadow-sm hover:border-brand-purple/50 transition-colors cursor-grab active:cursor-grabbing' },
+                            React.createElement('h4', { className: 'font-semibold text-white mb-2' }, task.name),
+                            React.createElement('div', { className: 'flex justify-between text-xs text-slate-400' },
+                                React.createElement('span', null, new Date(task.end).toLocaleDateString()),
+                                React.createElement('span', { className: `${task.progress === 100 ? 'text-green-400' : 'text-brand-purple-light'}` }, `${task.progress}%`)
+                            ),
+                            React.createElement('div', { className: 'w-full bg-slate-700 h-1.5 mt-2 rounded-full' },
+                                React.createElement('div', { className: 'bg-brand-purple h-1.5 rounded-full', style: { width: `${task.progress}%` } })
+                            )
+                        )
+                    ))
+                )
+            )
+        ))
+    );
+};
 
 const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, setIsLoading, error, setError }) => {
     const t = i18n[language];
     const fullscreenRef = useRef(null);
     const [collapsed, setCollapsed] = useState({});
     const [scale, setScale] = useState('days'); 
+    const [viewMode, setViewMode] = useState('timeline'); // timeline, list, board
+    const [localSchedule, setLocalSchedule] = useState([]);
 
     useEffect(() => {
         if (projectData.plan && !projectData.schedule && !isLoading) {
@@ -247,6 +347,7 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                     setError(null);
                     const schedule = await generateScheduleFromPlan(projectData.plan);
                     onUpdateProject({ schedule });
+                    setLocalSchedule(schedule);
                 } catch (err) {
                     setError(err.message || "Failed to generate schedule.");
                 } finally {
@@ -254,25 +355,73 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                 }
             };
             generate();
+        } else if (projectData.schedule) {
+            setLocalSchedule(projectData.schedule);
         }
     }, [projectData.plan, projectData.schedule, isLoading, onUpdateProject, setIsLoading, setError]);
 
+    const handleTaskUpdate = (id, field, value) => {
+        const updatedSchedule = localSchedule.map(task => 
+            task.id === id ? { ...task, [field]: value } : task
+        );
+        setLocalSchedule(updatedSchedule);
+        onUpdateProject({ schedule: updatedSchedule });
+    };
+
+    const handleExpandAll = () => setCollapsed({});
+    const handleCollapseAll = () => {
+        const allPhases = {};
+        localSchedule.forEach(t => { if(t.type === 'project') allPhases[t.id] = true; });
+        setCollapsed(allPhases);
+    };
+
+    const handleExport = () => window.print();
 
     const renderContent = () => {
         if (isLoading) return React.createElement(LoadingView, null);
-        if (projectData.schedule) {
-             return React.createElement(GanttChart, { data: projectData.schedule, collapsed, setCollapsed, scale });
+        if (!localSchedule || localSchedule.length === 0) return React.createElement(LoadingView, null);
+
+        switch (viewMode) {
+            case 'list':
+                return React.createElement(ListView, { data: localSchedule, onUpdateTask: handleTaskUpdate });
+            case 'board':
+                return React.createElement(BoardView, { data: localSchedule });
+            case 'timeline':
+            default:
+                return React.createElement(GanttChart, { data: localSchedule, collapsed, setCollapsed, scale });
         }
-        return React.createElement(LoadingView, null); 
     };
 
     return React.createElement('div', { ref: fullscreenRef, className: "h-full flex flex-col text-white bg-dark-card printable-container" },
-        React.createElement('div', { className: 'flex-grow min-h-0 overflow-y-auto' },
-            React.createElement('div', {
-               className: 'p-6 printable-content h-full flex flex-col',
-            },
-                React.createElement('div', { className: 'h-full flex items-center justify-center' }, renderContent())
+        React.createElement('div', { className: 'non-printable flex items-center gap-4 px-6 pt-4' },
+            React.createElement('div', { className: 'flex bg-dark-card-solid p-1 rounded-lg border border-dark-border' },
+                React.createElement('button', {
+                    onClick: () => setViewMode('board'),
+                    className: `flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-colors ${viewMode === 'board' ? 'bg-dark-bg text-white shadow-sm' : 'text-slate-400 hover:text-white'}`
+                }, React.createElement(BoardIcon, { className: "w-4 h-4" }), "Board"),
+                React.createElement('button', {
+                    onClick: () => setViewMode('list'),
+                    className: `flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-colors ${viewMode === 'list' ? 'bg-dark-bg text-white shadow-sm' : 'text-slate-400 hover:text-white'}`
+                }, React.createElement(ListIcon, { className: "w-4 h-4" }), "List"),
+                React.createElement('button', {
+                    onClick: () => setViewMode('timeline'),
+                    className: `flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-colors ${viewMode === 'timeline' ? 'bg-dark-bg text-white shadow-sm' : 'text-slate-400 hover:text-white'}`
+                }, React.createElement(TimelineIcon, { className: "w-4 h-4" }), "Timeline")
             )
+        ),
+        
+        React.createElement(FeatureToolbar, {
+            title: t.dashboardScheduling,
+            containerRef: fullscreenRef,
+            onScaleChange: viewMode === 'timeline' ? setScale : null,
+            scale: scale,
+            onExpandAll: viewMode === 'timeline' ? handleExpandAll : null,
+            onCollapseAll: viewMode === 'timeline' ? handleCollapseAll : null,
+            onExport: handleExport,
+        }),
+
+        React.createElement('div', { className: 'flex-grow min-h-0 overflow-hidden p-6' },
+            renderContent()
         )
     );
 };

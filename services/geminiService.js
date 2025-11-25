@@ -1,8 +1,5 @@
-
-
-
 import { GoogleGenAI, Modality, Type } from "@google/genai";
-import { getUserSettings } from "./supabaseClient.js";
+import { getUserSettings, getEnv } from "./supabaseClient.js";
 
 // --- Configuration Helper ---
 
@@ -25,7 +22,9 @@ const getAdminApiKey = () => {
     const settings = getAiSettings();
     const provider = getAdminProvider();
     if (provider === 'google') {
-        return (settings.aiApiKey && settings.aiApiKey.trim() !== '') ? settings.aiApiKey : window.process?.env?.API_KEY;
+        // Try User Settings (Admin override) first, then fallback to Environment Variable
+        const envKey = getEnv('API_KEY');
+        return (settings.aiApiKey && settings.aiApiKey.trim() !== '') ? settings.aiApiKey : envKey;
     }
     return settings.aiApiKey;
 };

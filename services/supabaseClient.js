@@ -1,8 +1,37 @@
-
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = window.process?.env?.SUPABASE_URL;
-const supabaseAnonKey = window.process?.env?.SUPABASE_ANON_KEY;
+// Helper to retrieve environment variables from various sources (Vite, Process, Window)
+export const getEnv = (key) => {
+    // 1. Check import.meta.env (Vite/Modern ESM)
+    try {
+        if (typeof import.meta !== 'undefined' && import.meta.env) {
+            if (import.meta.env[key]) return import.meta.env[key];
+            if (import.meta.env[`VITE_${key}`]) return import.meta.env[`VITE_${key}`];
+        }
+    } catch (e) {}
+
+    // 2. Check process.env (Node/Webpack/Browserify)
+    try {
+        if (typeof process !== 'undefined' && process.env) {
+            if (process.env[key]) return process.env[key];
+            if (process.env[`REACT_APP_${key}`]) return process.env[`REACT_APP_${key}`];
+            if (process.env[`NEXT_PUBLIC_${key}`]) return process.env[`NEXT_PUBLIC_${key}`];
+        }
+    } catch (e) {}
+
+    // 3. Check window/runtime injection (Legacy env.js or Docker entrypoint scripts)
+    try {
+        if (typeof window !== 'undefined') {
+            if (window.process?.env?.[key]) return window.process.env[key];
+            if (window._env_?.[key]) return window._env_[key];
+        }
+    } catch (e) {}
+
+    return '';
+};
+
+const supabaseUrl = getEnv('SUPABASE_URL');
+const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY');
 
 const isValidSupabaseConfig = () => 
     supabaseUrl && supabaseUrl !== 'YOUR_SUPABASE_URL_HERE' && 
@@ -47,7 +76,11 @@ export const signOut = async () => {
     if (!supabase) return;
     const { error } = await supabase.auth.signOut();
     // Clear any local artifacts if needed
-    localStorage.removeItem('sb-' + (new URL(supabaseUrl).hostname.split('.')[0]) + '-auth-token'); 
+    if (supabaseUrl) {
+        try {
+            localStorage.removeItem('sb-' + (new URL(supabaseUrl).hostname.split('.')[0]) + '-auth-token'); 
+        } catch(e) {}
+    }
     return { error };
 };
 
@@ -196,6 +229,36 @@ export const saveProject = async (projectId, projectData) => {
 
     if (result.error) throw result.error;
     return result.data;
+};
+
+export const deleteProject = async (projectId) => {
+    if (!supabase) throw new Error("Supabase not configured");
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) throw new Error("User not authenticated");
+
+    const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId)
+        .eq('user_id', session.user.id);
+
+    if (error) throw error;
+    return true;
+};
+
+export const updateProjectTitle = async (projectId, newTitle) => {
+    if (!supabase) throw new Error("Supabase not configured");
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) throw new Error("User not authenticated");
+
+    const { error } = await supabase
+        .from('projects')
+        .update({ title: newTitle, updated_at: new Date().toISOString() })
+        .eq('id', projectId)
+        .eq('user_id', session.user.id);
+
+    if (error) throw error;
+    return true;
 };
 
 export const saveChatMessage = async (serviceId, messageData) => {
