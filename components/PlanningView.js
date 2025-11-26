@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { i18n } from '../constants.js';
 import { generateProjectPlan } from '../services/planningService.js';
@@ -128,12 +127,12 @@ const InputView = ({ onGenerate, isLoading, error }) => {
                     )
                  ),
                  React.createElement('div', null,
-                    React.createElement('label', { className: 'block text-sm font-medium text-brand-text-light mb-1' }, "Duration (Optional)"),
+                    React.createElement('label', { className: 'block text-sm font-medium text-brand-text-light mb-1' }, "Duration (Months) (Optional)"),
                     React.createElement('input', {
-                        type: 'text',
+                        type: 'number',
                         value: duration,
                         onChange: e => setDuration(e.target.value),
-                        placeholder: "e.g. 6 months",
+                        placeholder: "e.g. 6",
                         className: "w-full p-3 bg-dark-card-solid border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none",
                         disabled: isLoading
                     })
@@ -170,18 +169,18 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
                 try {
                     setIsLoading(true);
                     setError(null);
-                    const plan = await generateProjectPlan(projectData.objective);
+                    // Pass explicit criteria if available from previous step
+                    const plan = await generateProjectPlan(projectData.objective, projectData.criteria);
                     onUpdateProject({ plan });
                 } catch (err) {
                     setError(err.message || 'An unexpected error occurred.');
-                    // Don't auto-reset completely, let user see error and maybe try again or edit objective
                 } finally {
                     setIsLoading(false);
                 }
             };
             generate();
         }
-    }, [projectData.objective, projectData.plan, isLoading, onUpdateProject, setIsLoading, setError]);
+    }, [projectData.objective, projectData.plan, projectData.criteria, isLoading, onUpdateProject, setIsLoading, setError]);
 
     const hasPlan = !!projectData.plan;
 
@@ -189,12 +188,9 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
         if (!projectData.objective) {
             return React.createElement(InputView, {
                 onGenerate: (objective, budget, currency, duration) => {
-                    // Combine constraints into objective string if needed, or pass them. 
-                    // For simplicity, we append constraints to objective to influence WBS.
-                    let enhancedObjective = objective;
-                    if (budget) enhancedObjective += ` Budget Limit: ${currency} ${budget}.`;
-                    if (duration) enhancedObjective += ` Duration: ${duration}.`;
-                    onUpdateProject({ objective: enhancedObjective });
+                    const criteria = { budget, currency, duration, budgetType: budget ? 'Fixed' : 'Predicted' };
+                    // Save both objective and criteria to be used by this and future steps
+                    onUpdateProject({ objective, criteria });
                 },
                 isLoading,
                 error
@@ -209,10 +205,8 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
         // Fallback for error state where objective exists but plan failed
         return React.createElement(InputView, {
              onGenerate: (objective, budget, currency, duration) => {
-                 let enhancedObjective = objective;
-                 if (budget) enhancedObjective += ` Budget Limit: ${currency} ${budget}.`;
-                 if (duration) enhancedObjective += ` Duration: ${duration}.`;
-                 onUpdateProject({ objective: enhancedObjective });
+                 const criteria = { budget, currency, duration, budgetType: budget ? 'Fixed' : 'Predicted' };
+                 onUpdateProject({ objective, criteria });
              },
              isLoading,
              error
@@ -233,8 +227,6 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
            React.createElement('div', {
                ref: contentRef,
                className: 'p-6 printable-content w-full pb-32', 
-               // transform-origin: top center prevents it from flying off when zoomed
-               // width: 100% ensures it takes full width
                style: { transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.2s ease', width: '100%' },
                contentEditable: isEditing,
                suppressContentEditableWarning: true

@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 
 export const Spinner = ({ size = '8' }) => (
@@ -214,7 +213,7 @@ export const DocumentIcon = ({ className = iconProps.className }) => React.creat
 );
 
 export const BoardIcon = ({ className = iconProps.className }) => React.createElement('svg', { ...iconProps, className },
-    React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" })
+    React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 00-2-2h-2a2 2 0 00-2 2" })
 );
 
 export const ListIcon = ({ className = iconProps.className }) => React.createElement('svg', { ...iconProps, className },
@@ -240,10 +239,11 @@ export const ExpandIcon = () => React.createElement('svg', toolbarIconProps, Rea
 export const CollapseIcon = () => React.createElement('svg', toolbarIconProps, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M5 15l7-7 7 7" }));
 export const EditIcon = () => React.createElement('svg', toolbarIconProps, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" }));
 export const ExportIcon = () => React.createElement('svg', toolbarIconProps, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" }));
+export const RefreshIcon = () => React.createElement('svg', toolbarIconProps, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" }));
 
 
 // --- New Feature Toolbar Component ---
-export const FeatureToolbar = ({ title, containerRef, onZoomIn, onZoomOut, onToggleEdit, isEditing, onExport, onExpandAll, onCollapseAll, scale, onScaleChange }) => {
+export const FeatureToolbar = ({ title, containerRef, onZoomIn, onZoomOut, onToggleEdit, isEditing, onExport, onExpandAll, onCollapseAll, scale, onScaleChange, customControls }) => {
     const [isFullscreen, setIsFullscreen] = React.useState(false);
 
     const handleFullscreen = () => {
@@ -273,7 +273,8 @@ export const FeatureToolbar = ({ title, containerRef, onZoomIn, onZoomOut, onTog
     const scaleOptions = [
         { id: 'days', label: 'Days' },
         { id: 'weeks', label: 'Weeks' },
-        { id: 'months', label: 'Months' }
+        { id: 'months', label: 'Months' },
+        { id: 'quarters', label: 'Quarter' }
     ];
 
     return React.createElement('div', {
@@ -281,6 +282,9 @@ export const FeatureToolbar = ({ title, containerRef, onZoomIn, onZoomOut, onTog
     },
         React.createElement('h2', { className: 'text-xl font-bold text-white' }, title),
         React.createElement('div', { className: 'flex items-center gap-2' },
+            customControls,
+            (customControls) && React.createElement('div', { className: 'w-px h-6 bg-dark-border mx-2' }),
+
             onZoomIn && React.createElement(IconButton, { icon: React.createElement(ZoomInIcon), onClick: onZoomIn, tooltip: 'Zoom In' }),
             onZoomOut && React.createElement(IconButton, { icon: React.createElement(ZoomOutIcon), onClick: onZoomOut, tooltip: 'Zoom Out' }),
             

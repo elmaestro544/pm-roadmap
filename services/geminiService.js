@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { getUserSettings, getEnv } from "./supabaseClient.js";
 
@@ -33,6 +34,35 @@ const getAdminModelId = (defaultModel = 'gemini-2.5-flash') => {
     const settings = getAiSettings();
     return settings.aiModel || defaultModel;
 };
+
+// --- Unified Config Resolver ---
+export const resolveAIConfig = async () => {
+    let provider = null;
+    let apiKey = null;
+    let model = null;
+
+    // 1. Try User Settings
+    try {
+        const userSettings = await getUserSettings();
+        if (userSettings && userSettings.aiApiKey) {
+            provider = userSettings.aiProvider || 'google';
+            apiKey = userSettings.aiApiKey;
+            model = userSettings.aiModel || 'gemini-2.5-flash';
+        }
+    } catch (e) {
+        console.warn("Could not fetch user settings, falling back.", e);
+    }
+
+    // 2. Fallback to Admin / Global
+    if (!apiKey) {
+        provider = getAdminProvider();
+        apiKey = getAdminApiKey();
+        model = getAdminModelId();
+    }
+
+    return { provider, apiKey, model };
+};
+
 
 // --- API Helpers ---
 
@@ -149,29 +179,7 @@ const generateOpenAICompatibleContent = async (baseUrl, apiKey, model, prompt, s
 // --- Main Exported Function ---
 
 export const generateAIContent = async (prompt, schema, systemInstruction = "You are a helpful assistant.") => {
-    // 1. Try to get User Specific Settings from Supabase
-    let provider = null;
-    let apiKey = null;
-    let model = null;
-
-    try {
-        const userSettings = await getUserSettings();
-        if (userSettings && userSettings.aiApiKey) {
-            provider = userSettings.aiProvider || 'google';
-            apiKey = userSettings.aiApiKey;
-            model = userSettings.aiModel || 'gemini-2.5-flash';
-        }
-    } catch (e) {
-        // Ignore user settings fetch error, fallback to admin
-        console.warn("Could not fetch user settings, using defaults.", e);
-    }
-
-    // 2. Fallback to Admin / Global Settings
-    if (!apiKey) {
-        provider = getAdminProvider();
-        apiKey = getAdminApiKey();
-        model = getAdminModelId();
-    }
+    const { provider, apiKey, model } = await resolveAIConfig();
 
     if (!apiKey) throw new Error(`${provider} API Key is missing. Check User or Admin Settings.`);
 
@@ -232,7 +240,6 @@ export const fetchAvailableModels = async (provider, apiKey) => {
 
 // --- Legacy / Specific Exports ---
 
-// These legacy checks still look at local environment for "System Health"
 export const isAnyModelConfigured = () => !!getAdminApiKey();
 export const isModelConfigured = () => !!getAdminApiKey();
 
@@ -241,42 +248,48 @@ export const getApiKey = getAdminApiKey;
 export const getModelId = getAdminModelId;
 
 // --- Chat Session Helper ---
-// Note: Real-time chat still relies on specific Google Client init or specific keys.
-// For now, we use the Admin Key for chat or generic content generation.
 
 export const getGeminiClient = () => {
+    // Deprecated: Try to use resolveAIConfig where possible, but this is sync for legacy
     const provider = getAdminProvider();
     if (provider !== 'google') return null;
     const apiKey = getAdminApiKey();
     return new GoogleGenAI({ apiKey });
 };
 
-export const createChatSession = () => {
-    // Only Google supports the stateful chat session object in this SDK
-    if (getProvider() === 'google') {
-        const client = getGeminiClient();
-        const model = getModelId('gemini-2.5-flash');
-        if (client) {
-             return client.chats.create({ 
-                model: model,
-                config: { systemInstruction: "You are an expert AI assistant." }
-            });
-        }
+// NEW: Async chat session creation that respects user settings
+export const createChatSessionAsync = async () => {
+    const config = await resolveAIConfig();
+    
+    if (config.provider === 'google' && config.apiKey) {
+        const client = new GoogleGenAI({ apiKey: config.apiKey });
+        const session = client.chats.create({ 
+            model: config.model || 'gemini-2.5-flash',
+            config: { systemInstruction: "You are an expert AI assistant." }
+        });
+        return {
+            session,
+            config,
+            isGeneric: false
+        };
     }
+    
+    return { 
+        isGeneric: true,
+        config
+    }; 
+};
+
+// Deprecated Sync Version (Wraps default)
+export const createChatSession = () => {
     return { isGeneric: true }; 
 };
 
-export const sendChatMessage = async (chatSession, message, file, useWebSearch) => {
-    // Note: Chat implementation currently defaults to Admin/Env settings for now due to complexity of streaming with user settings sync.
-    // Ideally this should also await getUserSettings() but keeping synchronous flow for chat session object creation.
+export const sendChatMessage = async (chatContext, message, file, useWebSearch) => {
+    // chatContext is the object returned by createChatSessionAsync
+    const { session, config, isGeneric } = chatContext;
     
-    const provider = getProvider();
-    
-    if (provider === 'google') {
-        const client = getGeminiClient(); 
-        if (!client) throw new Error("Google Client not init");
-        const model = getModelId('gemini-2.5-flash');
-
+    if (!isGeneric && session && config.provider === 'google') {
         const messageParts = [{ text: message }];
         if (file) {
             const base64EncodedDataPromise = new Promise((resolve) => {
@@ -288,19 +301,22 @@ export const sendChatMessage = async (chatSession, message, file, useWebSearch) 
         }
 
         if (useWebSearch) {
+            // Google Search Tool requires a fresh generation call, not chat stream usually
+            const client = new GoogleGenAI({ apiKey: config.apiKey });
             const result = await client.models.generateContent({
-                model: model,
+                model: config.model,
                 contents: { parts: messageParts },
                 config: { tools: [{ googleSearch: {} }] },
             });
             return { text: result.text, sources: result.candidates?.[0]?.groundingMetadata?.groundingChunks || [], isStream: false };
         } else {
-            const stream = await chatSession.sendMessageStream({ message: { parts: messageParts } });
+            const stream = await session.sendMessageStream({ message: { parts: messageParts } });
             return { stream, isStream: true };
         }
     } 
     else {
-        // Simple one-off call using generic handler (which DOES check user settings)
+        // Generic Provider Call
+        // We use the config resolved during session creation to ensure consistency
         const responseText = await generateAIContent(message, null, "You are a helpful AI assistant for project management.");
         return { text: responseText, isStream: false, sources: [] };
     }
@@ -352,11 +368,13 @@ export function createPcmBlob(data) {
   };
 }
 
-export const startVoiceSession = (callbacks) => {
-    if (getProvider() !== 'google') {
+export const startVoiceSession = async (callbacks) => {
+    const config = await resolveAIConfig();
+    
+    if (config.provider !== 'google') {
         throw new Error("Voice Chat is only available with Google Gemini provider.");
     }
-    const client = getGeminiClient();
+    const client = new GoogleGenAI({ apiKey: config.apiKey });
     const sessionPromise = client.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         callbacks: callbacks,

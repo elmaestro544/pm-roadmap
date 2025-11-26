@@ -21,14 +21,22 @@ const ganttChartSchema = {
     }
 };
 
-export const generateScheduleFromPlan = async (projectPlan) => {
+export const generateScheduleFromPlan = async (projectPlan, criteria) => {
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     const projectStartDate = tomorrow.toISOString().split('T')[0];
 
+    let durationConstraint = "";
+    if (criteria && criteria.duration) {
+        durationConstraint = `CRITICAL CONSTRAINT: The entire schedule from start to finish MUST fit within ${criteria.duration} months. Ensure the final task ends before this limit.`;
+    } else {
+        durationConstraint = "Estimate a realistic timeline based on the scope.";
+    }
+
     const prompt = `
         Create a Gantt chart schedule starting ${projectStartDate}.
+        ${durationConstraint}
         Project Plan: ${JSON.stringify(projectPlan, null, 2)}
         Instructions: Convert WBS items/milestones to tasks. Assign 'id', 'start', 'end' dates. 'type' should be 'project' for phases, 'task' for items. Establish dependencies. Return JSON array.
     `;

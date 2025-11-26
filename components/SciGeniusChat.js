@@ -1,5 +1,4 @@
 
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { i18n } from '../constants.js';
 import * as apiService from '../services/geminiService.js';
@@ -10,10 +9,11 @@ import HistoryPanel from './HistoryPanel.js';
 
 const AssistantView = ({ language, currentUser }) => {
   const t = i18n[language];
-  const [chat, setChat] = useState(null);
+  const [chatContext, setChatContext] = useState(null);
   const [messages, setMessages] = useState([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [file, setFile] = useState(null);
   const [useWebSearch, setUseWebSearch] = useState(false);
   const [history, setHistory] = useState([]);
@@ -37,7 +37,7 @@ const AssistantView = ({ language, currentUser }) => {
   const currentInputTranscriptionRef = useRef('');
   const currentOutputTranscriptionRef = useRef('');
 
-  // Toolbar state and handlers
+  // Toolbar state
   const [zoomLevel, setZoomLevel] = useState(1);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -46,14 +46,34 @@ const AssistantView = ({ language, currentUser }) => {
   const handleToggleEdit = () => setIsEditing(prev => !prev);
   const handleExport = () => window.print();
   
+  // Check initial config status (legacy check, might be updated by async check)
   const isGeminiConfigured = apiService.isModelConfigured('gemini');
 
+  // Initialize Chat Session Asynchronously
   useEffect(() => {
-    setChat(apiService.createChatSession());
-    setMessages([{
-        sender: 'model',
-        text: t.assistantDescription,
-    }]);
+    let mounted = true;
+    const initChat = async () => {
+        try {
+            setIsInitializing(true);
+            const context = await apiService.createChatSessionAsync();
+            if (mounted) {
+                setChatContext(context);
+                setMessages([{
+                    sender: 'model',
+                    text: t.assistantDescription,
+                }]);
+            }
+        } catch (e) {
+            console.error("Failed to init chat", e);
+            if (mounted) {
+                setMessages([{ sender: 'model', text: "Failed to initialize AI service. Please check settings." }]);
+            }
+        } finally {
+            if (mounted) setIsInitializing(false);
+        }
+    };
+    initChat();
+    return () => { mounted = false; };
   }, [t.assistantDescription]);
 
   useEffect(() => {
@@ -197,7 +217,7 @@ const AssistantView = ({ language, currentUser }) => {
         sessionPromiseRef.current = apiService.startVoiceSession(callbacks);
     } catch (error) {
         console.error('Failed to start voice session:', error);
-        setMessages(prev => [...prev.filter(m => !m.isListening), { sender: 'model', text: 'Could not access microphone.' }]);
+        setMessages(prev => [...prev.filter(m => !m.isListening), { sender: 'model', text: 'Could not access microphone or API error.' }]);
     }
   }, [stopSession, onVoiceMessage]);
   
@@ -222,7 +242,7 @@ const AssistantView = ({ language, currentUser }) => {
   };
 
   const handleSendMessage = useCallback(async (messageText) => {
-    if (!messageText.trim() || isLoading) return;
+    if (!messageText.trim() || isLoading || !chatContext) return;
     
     const userMessage = { sender: 'user', text: messageText };
     if (file) {
@@ -235,7 +255,7 @@ const AssistantView = ({ language, currentUser }) => {
     setIsLoading(true);
 
     try {
-      const result = await apiService.sendChatMessage(chat, messageText, currentFile, useWebSearch);
+      const result = await apiService.sendChatMessage(chatContext, messageText, currentFile, useWebSearch);
 
       if (result.isStream) {
         let responseText = '';
@@ -264,14 +284,18 @@ const AssistantView = ({ language, currentUser }) => {
       }
     } catch (error) {
       console.error("Error sending message:", error);
-      setMessages(prev => [...prev, { sender: 'model', text: t.errorOccurred }]);
+      setMessages(prev => [...prev, { sender: 'model', text: t.errorOccurred + ` (${error.message})` }]);
     } finally {
       setIsLoading(false);
     }
-  }, [chat, file, useWebSearch, isLoading, t.errorOccurred, currentUser]);
+  }, [chatContext, file, useWebSearch, isLoading, t.errorOccurred, currentUser]);
 
-  const handleHistoryItemClick = (item) => {
-      setChat(apiService.createChatSession());
+  const handleHistoryItemClick = async (item) => {
+      // Reset chat context when loading history item
+      // Note: This loses context window, but ensures clean state
+      const newContext = await apiService.createChatSessionAsync();
+      setChatContext(newContext);
+      
       const newMessages = [
         { sender: 'user', text: item.user, file: item.file },
         { sender: 'model', text: item.model, sources: item.sources }
@@ -324,6 +348,7 @@ const AssistantView = ({ language, currentUser }) => {
             ),
             React.createElement('div', { className: "flex flex-col flex-grow bg-dark-card-solid/80 rounded-2xl overflow-hidden" },
                 React.createElement('div', { ref: chatContainerRef, className: "flex-grow p-4 space-y-4 overflow-y-auto" },
+                    isInitializing && React.createElement('div', { className: "flex justify-center p-4" }, React.createElement(Spinner, { size: "6" })),
                     messages.map((msg, index) => (
                     React.createElement('div', { key: index, className: `flex ${msg.sender === 'user' ? (language === 'ar' ? 'justify-start' : 'justify-end') : (language === 'ar' ? 'justify-end' : 'justify-start')}` },
                         React.createElement('div', { className: `relative max-w-xl p-3 rounded-2xl shadow-md ${msg.sender === 'user' ? 'bg-brand-purple text-white' : 'bg-dark-card text-brand-text'}` },
@@ -354,8 +379,9 @@ const AssistantView = ({ language, currentUser }) => {
                     )
                 ),
                 React.createElement('div', { className: "p-4 border-t border-dark-border bg-dark-card/50 non-printable" },
-                    !isGeminiConfigured && React.createElement('div', { className: "text-center bg-red-500/10 p-2 rounded-md mb-2 text-xs text-red-400 font-semibold" },
-                        "Gemini API Key is not configured."
+                    // Display warning if using fallback API config when User config was expected but missing
+                    (!isGeminiConfigured && !chatContext?.config?.apiKey) && React.createElement('div', { className: "text-center bg-red-500/10 p-2 rounded-md mb-2 text-xs text-red-400 font-semibold" },
+                        "API Key is not configured."
                     ),
                     file && React.createElement('div', { className: "flex items-center justify-between bg-black/20 text-sm py-1 px-3 rounded-md mb-2" },
                         React.createElement('span', { className: "truncate" }, file.name),
@@ -365,7 +391,7 @@ const AssistantView = ({ language, currentUser }) => {
                         React.createElement('div', { className: `flex items-end gap-2 ${language === 'ar' ? 'flex-row-reverse' : ''}` },
                             React.createElement('button', {
                                 onClick: handleToggleVoiceChat,
-                                disabled: !isGeminiConfigured,
+                                disabled: !chatContext?.config?.apiKey || isInitializing,
                                 'aria-label': isVoiceSessionActive ? 'Stop voice chat' : 'Start voice chat',
                                 className: `h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center transition-all ${isVoiceSessionActive ? 'bg-red-500 text-white animate-pulse-fast' : 'bg-dark-card-solid text-brand-text-light hover:bg-white/10'}`
                             }, React.createElement(MicrophoneIcon, { className: "h-5 w-5" })),
@@ -382,10 +408,10 @@ const AssistantView = ({ language, currentUser }) => {
                                     rows: 1,
                                     className: "w-full bg-dark-bg border border-dark-border rounded-full py-2.5 resize-none focus:ring-2 focus:ring-brand-purple focus:outline-none transition-all shadow-inner placeholder-slate-500 text-white disabled:bg-slate-800/70",
                                     style: language === 'ar' ? { paddingLeft: '3.5rem', paddingRight: '1rem' } : { paddingLeft: '1rem', paddingRight: '3.5rem' },
-                                    disabled: isLoading || !isGeminiConfigured || isVoiceSessionActive
+                                    disabled: isLoading || isInitializing || isVoiceSessionActive || !chatContext?.config?.apiKey
                                 }),
                                 React.createElement('button', {
-                                    onClick: () => handleSendMessage(userInput), disabled: !userInput.trim() || isLoading || !isGeminiConfigured || isVoiceSessionActive,
+                                    onClick: () => handleSendMessage(userInput), disabled: !userInput.trim() || isLoading || isInitializing || isVoiceSessionActive || !chatContext?.config?.apiKey,
                                     className: `absolute h-8 w-8 rounded-full flex items-center justify-center bg-button-gradient hover:opacity-90 disabled:bg-slate-600 disabled:cursor-not-allowed transition-all ${language === 'ar' ? 'left-2' : 'right-2'}`
                                 }, React.createElement(SendIcon, { className: "h-5 w-5 text-white" }))
                             )

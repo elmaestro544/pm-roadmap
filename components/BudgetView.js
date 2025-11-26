@@ -1,5 +1,4 @@
 
-
 // components/BudgetView.js
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -98,12 +97,14 @@ const BudgetView = ({ language, projectData, onUpdateProject, isLoading, setIsLo
                 try {
                     setIsLoading(true);
                     setError(null);
+                    // Pass criteria to budget service
                     const budget = await generateProjectBudget({
                         objectives: projectData.objective,
                         scope: "A standard project scope including planning, execution, and closure.",
-                        currency: 'USD',
+                        // Fallback values if criteria is missing
+                        currency: projectData.criteria?.currency || 'USD',
                         contingency: '15'
-                    });
+                    }, projectData.criteria);
                     onUpdateProject({ budget });
                 } catch (err) {
                     setError(err.message || "Failed to generate budget.");
@@ -113,7 +114,7 @@ const BudgetView = ({ language, projectData, onUpdateProject, isLoading, setIsLo
             };
             generate();
         }
-    }, [projectData.objective, projectData.budget, isLoading, onUpdateProject, setIsLoading, setError]);
+    }, [projectData.objective, projectData.budget, projectData.criteria, isLoading, onUpdateProject, setIsLoading, setError]);
 
 
     const renderContent = () => {

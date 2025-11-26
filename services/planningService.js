@@ -1,5 +1,4 @@
 
-
 import { Type } from "@google/genai";
 import { generateAIContent } from "./geminiService.js";
 
@@ -49,9 +48,24 @@ const projectPlanSchema = {
     required: ['workBreakdownStructure', 'keyMilestones']
 };
 
-export const generateProjectPlan = async (objective) => {
+export const generateProjectPlan = async (objective, criteria) => {
+    let constraintText = "";
+    if (criteria) {
+        if (criteria.duration) {
+            constraintText += `\nCONSTRAINT: The total project duration MUST strictly fit within ${criteria.duration} months. Adjust task durations accordingly.`;
+        } else {
+            constraintText += `\nINSTRUCTION: Estimate a realistic duration for this project scope.`;
+        }
+        
+        if (criteria.budget) {
+            const type = criteria.budgetType === 'Fixed' ? "Strict Constraint" : "Guideline";
+            constraintText += `\n${type}: Total Budget is ${criteria.currency} ${criteria.budget}. Ensure the scale of the WBS reflects this.`;
+        }
+    }
+
     const prompt = `Based on the following project objective, create a comprehensive project plan.
     Objective: "${objective}"
+    ${constraintText}
     
     IMPORTANT INSTRUCTIONS:
     1. Generate a detailed Work Breakdown Structure (WBS) that MUST START FROM PHASE 1 (e.g., Planning/Mobilization/Design). DO NOT START FROM THE MIDDLE.

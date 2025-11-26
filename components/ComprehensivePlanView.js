@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { generateConsultingPlan } from '../services/comprehensivePlanService.js';
-import { DocumentIcon, Spinner, FeatureToolbar, EditIcon } from './Shared.js';
+import { DocumentIcon, Spinner, FeatureToolbar, EditIcon, RefreshIcon } from './Shared.js';
 import { i18n } from '../constants.js';
 
 // --- Markdown Renderer ---
@@ -320,34 +320,17 @@ const SectionCard = ({ title, content }) => (
     )
 );
 
-const ResultsView = ({ plan, criteria, onReset, onEdit }) => {
+const ResultsView = ({ plan, criteria }) => {
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
     return React.createElement('div', { className: 'animate-fade-in-up max-w-5xl mx-auto' },
-        // Header Controls (Non-printable)
-        React.createElement('div', { className: 'flex justify-between items-start mb-8 non-printable' },
-            React.createElement('div', null,
-                React.createElement('h2', { className: 'text-xl font-bold text-white' }, "Project Management Plan"),
-                // Criteria Summary
-                criteria && React.createElement('div', { className: 'flex flex-wrap gap-3 mt-2 text-xs text-brand-text-light' },
-                    React.createElement('span', { className: 'bg-dark-card-solid px-2 py-1 rounded border border-dark-border' }, `Location: ${criteria.location}`),
-                    criteria.budget && React.createElement('span', { className: 'bg-dark-card-solid px-2 py-1 rounded border border-dark-border' }, `Budget: ${criteria.currency} ${criteria.budget} (${criteria.budgetType || 'Fixed'})`),
-                    criteria.duration && React.createElement('span', { className: 'bg-dark-card-solid px-2 py-1 rounded border border-dark-border' }, `Duration: ${criteria.duration} Months`)
-                )
-            ),
-            React.createElement('div', { className: 'flex gap-3' },
-                 React.createElement('button', {
-                    onClick: onEdit,
-                    className: 'px-4 py-2 text-sm font-semibold text-brand-purple-light bg-brand-purple/10 hover:bg-brand-purple/20 border border-brand-purple/50 rounded-lg flex items-center gap-2'
-                }, React.createElement(EditIcon, { className: 'w-4 h-4' }), "Edit Criteria"),
-                 React.createElement('button', {
-                    onClick: () => window.print(),
-                    className: 'px-4 py-2 text-sm font-semibold text-white bg-button-gradient hover:opacity-90 rounded-lg shadow-md'
-                }, "Print / Save PDF"),
-                React.createElement('button', {
-                    onClick: onReset,
-                    className: 'px-4 py-2 text-sm font-semibold text-white bg-dark-card-solid hover:bg-white/10 border border-dark-border rounded-lg'
-                }, "Create New Plan")
+        // Criteria Summary (Moved to top of content, non-printable or printable based on preference, usually good to print)
+        criteria && React.createElement('div', { className: 'mb-8 p-4 bg-dark-card-solid/50 border border-dark-border rounded-lg print:border-gray-300 print:bg-white print:text-black' },
+            React.createElement('h4', { className: 'text-xs font-bold text-brand-purple-light uppercase mb-2 print:text-black' }, "Project Parameters"),
+            React.createElement('div', { className: 'flex flex-wrap gap-4 text-sm text-brand-text-light print:text-black' },
+                React.createElement('span', null, React.createElement('strong', { className: "text-white print:text-black" }, "Location: "), criteria.location),
+                criteria.budget && React.createElement('span', null, React.createElement('strong', { className: "text-white print:text-black" }, "Budget: "), `${criteria.currency} ${criteria.budget} (${criteria.budgetType || 'Fixed'})`),
+                criteria.duration && React.createElement('span', null, React.createElement('strong', { className: "text-white print:text-black" }, "Duration: "), `${criteria.duration} Months`)
             )
         ),
         
@@ -402,6 +385,13 @@ const ComprehensivePlanView = ({ language, projectData, onUpdateProject, isLoadi
     const [isEditingCriteria, setIsEditingCriteria] = useState(false);
     const [criteria, setCriteria] = useState(null);
 
+    // Initialize criteria from projectData if available (on re-mount)
+    useEffect(() => {
+        if (projectData.criteria) {
+            setCriteria(projectData.criteria);
+        }
+    }, [projectData.criteria]);
+
     // Toolbar state
     const [zoomLevel, setZoomLevel] = useState(1);
     const [isEditing, setIsEditing] = useState(false);
@@ -420,11 +410,12 @@ const ComprehensivePlanView = ({ language, projectData, onUpdateProject, isLoadi
         try {
             const plan = await generateConsultingPlan(formData);
             
-            // Save plan AND sync the project objective to unlock other workflow steps
+            // Save plan AND sync criteria AND objective to unlock other workflow steps
             onUpdateProject({ 
                 consultingPlan: plan,
                 objective: plan.scopeAndObjectives || formData.scope,
-                title: plan.projectTitle || formData.name
+                title: plan.projectTitle || formData.name,
+                criteria: formData // KEY UPDATE: Persist criteria for other services
             });
             
         } catch (err) {
@@ -435,7 +426,7 @@ const ComprehensivePlanView = ({ language, projectData, onUpdateProject, isLoadi
     };
 
     const handleReset = () => {
-        onUpdateProject({ consultingPlan: null });
+        onUpdateProject({ consultingPlan: null, criteria: null });
         setCriteria(null);
         setError(null);
         setIsEditingCriteria(false);
@@ -443,6 +434,21 @@ const ComprehensivePlanView = ({ language, projectData, onUpdateProject, isLoadi
 
     // Check if plan exists in props
     const hasPlan = !!projectData.consultingPlan;
+
+    const customControls = (
+        React.createElement(React.Fragment, null,
+            React.createElement('button', {
+                onClick: () => setIsEditingCriteria(true),
+                className: 'p-2 rounded-md text-brand-text-light hover:bg-white/10 hover:text-white transition-colors',
+                title: "Edit Criteria"
+            }, React.createElement(EditIcon, { className: "h-5 w-5" })),
+            React.createElement('button', {
+                onClick: handleReset,
+                className: 'p-2 rounded-md text-brand-text-light hover:bg-white/10 hover:text-white transition-colors',
+                title: "Refresh / New Plan"
+            }, React.createElement(RefreshIcon, { className: "h-5 w-5" }))
+        )
+    );
 
     return React.createElement('div', { ref: fullscreenRef, className: "h-full flex flex-col text-white bg-dark-card printable-container" },
         hasPlan && !isEditingCriteria && React.createElement(FeatureToolbar, {
@@ -453,6 +459,7 @@ const ComprehensivePlanView = ({ language, projectData, onUpdateProject, isLoadi
             onToggleEdit: handleToggleEdit,
             isEditing: isEditing,
             onExport: handleExport,
+            customControls: customControls
         }),
         React.createElement('div', { className: 'flex-grow min-h-0 overflow-auto' },
             React.createElement('div', {
@@ -467,9 +474,7 @@ const ComprehensivePlanView = ({ language, projectData, onUpdateProject, isLoadi
                 : (hasPlan && !isEditingCriteria)
                     ? React.createElement(ResultsView, { 
                         plan: projectData.consultingPlan, 
-                        criteria: criteria, 
-                        onReset: handleReset, 
-                        onEdit: () => setIsEditingCriteria(true) 
+                        criteria: projectData.criteria || criteria 
                       })
                     : React.createElement('div', { className: 'h-full flex items-center justify-center' }, 
                         React.createElement(InputView, { 

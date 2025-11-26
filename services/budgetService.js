@@ -24,15 +24,29 @@ const budgetEstimationSchema = {
     required: ['budgetItems']
 };
 
-export const generateProjectBudget = async (projectDetails) => {
-    const { objectives, currency, budgetCap, contingency, scope } = projectDetails;
+export const generateProjectBudget = async (projectDetails, criteria) => {
+    const { objectives, scope } = projectDetails;
+    const currency = criteria?.currency || 'USD';
+    const budgetCap = criteria?.budget;
+    const budgetType = criteria?.budgetType; // Fixed or Predicted
+
+    let budgetConstraint = "";
+    if (budgetCap) {
+        if (budgetType === 'Fixed') {
+            budgetConstraint = `STRICT CONSTRAINT: The total cost (Labor + Materials + Contingency) MUST NOT exceed ${currency} ${budgetCap}. Distribute funds accordingly.`;
+        } else {
+            budgetConstraint = `GUIDELINE: The target baseline budget is ${currency} ${budgetCap}. Use this as a reference but estimate realistically based on scope.`;
+        }
+    } else {
+        budgetConstraint = `ESTIMATE: No budget cap provided. Estimate total costs realistically based on market rates for this scope in ${currency}.`;
+    }
 
     const prompt = `
         Create a detailed budget breakdown.
         Objectives: "${objectives}"
         Scope: "${scope}"
-        Currency: ${currency || 'USD'}
-        Contingency: ${contingency || '10'}%
+        Currency: ${currency}
+        ${budgetConstraint}
         Generate 5-8 budget items with labor/material splits. Return JSON.
     `;
 
