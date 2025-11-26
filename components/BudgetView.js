@@ -16,10 +16,10 @@ const LoadingView = ({ progress }) => (
     )
 );
 
-const ResultsView = ({ data, onDiscard, onSave }) => {
+const ResultsView = ({ data, onDiscard, onSave, currency }) => {
     const [forecastType, setForecastType] = useState('Basic');
 
-    const formatCurrency = (value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(value);
+    const formatCurrency = (value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', minimumFractionDigits: 0 }).format(value);
 
     const summary = useMemo(() => {
         if (!data?.budgetItems) return { total: 0, labor: 0, material: 0, contingency: 0 };
@@ -90,6 +90,7 @@ const ResultsView = ({ data, onDiscard, onSave }) => {
 const BudgetView = ({ language, projectData, onUpdateProject, isLoading, setIsLoading, error, setError }) => {
     const t = i18n[language];
     const fullscreenRef = useRef(null);
+    const currency = projectData.criteria?.currency || 'USD';
 
     useEffect(() => {
         if (projectData.objective && !projectData.budget && !isLoading) {
@@ -102,7 +103,7 @@ const BudgetView = ({ language, projectData, onUpdateProject, isLoading, setIsLo
                         objectives: projectData.objective,
                         scope: "A standard project scope including planning, execution, and closure.",
                         // Fallback values if criteria is missing
-                        currency: projectData.criteria?.currency || 'USD',
+                        currency: currency,
                         contingency: '15'
                     }, projectData.criteria);
                     onUpdateProject({ budget });
@@ -114,12 +115,12 @@ const BudgetView = ({ language, projectData, onUpdateProject, isLoading, setIsLo
             };
             generate();
         }
-    }, [projectData.objective, projectData.budget, projectData.criteria, isLoading, onUpdateProject, setIsLoading, setError]);
+    }, [projectData.objective, projectData.budget, projectData.criteria, currency, isLoading, onUpdateProject, setIsLoading, setError]);
 
 
     const renderContent = () => {
         if (isLoading) return React.createElement(LoadingView, null);
-        if (projectData.budget) return React.createElement(ResultsView, { data: projectData.budget });
+        if (projectData.budget) return React.createElement(ResultsView, { data: projectData.budget, currency });
         return React.createElement(LoadingView, null);
     };
 

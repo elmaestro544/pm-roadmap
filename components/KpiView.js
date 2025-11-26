@@ -1,3 +1,4 @@
+
 // components/KpiView.js
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -57,7 +58,7 @@ const KpiCard = ({ title, value, unit, description, color = 'text-brand-purple-l
     )
 );
 
-const ResultsView = ({ data }) => {
+const ResultsView = ({ data, currency }) => {
     const { kpis, analysis } = data;
 
     const spiColor = kpis.spi >= 1.0 ? 'text-green-400' : 'text-red-400';
@@ -73,7 +74,7 @@ const ResultsView = ({ data }) => {
             ),
             React.createElement(KpiCard, { title: 'Schedule Performance', value: kpis.spi, unit: 'SPI', description: kpis.spi >= 1.0 ? 'Ahead of schedule' : 'Behind schedule', color: spiColor }),
             React.createElement(KpiCard, { title: 'Cost Performance', value: kpis.cpi, unit: 'CPI', description: kpis.cpi >= 1.0 ? 'Under budget' : 'Over budget', color: cpiColor }),
-            React.createElement(KpiCard, { title: 'Budget At Completion', value: kpis.budgetAtCompletion.toLocaleString('en-US'), unit: 'USD', description: 'Total planned budget' })
+            React.createElement(KpiCard, { title: 'Budget At Completion', value: kpis.budgetAtCompletion.toLocaleString('en-US'), unit: currency, description: 'Total planned budget' })
         ),
         React.createElement('div', { className: 'flex-grow grid grid-cols-1 lg:grid-cols-2 gap-6' },
             React.createElement('div', { className: 'bg-dark-card-solid p-6 rounded-xl border border-dark-border glow-border' },
@@ -90,10 +91,10 @@ const ResultsView = ({ data }) => {
                  )
             ),
              React.createElement('div', { className: 'bg-dark-card-solid p-6 rounded-xl border border-dark-border glow-border grid grid-cols-2 gap-6' },
-                React.createElement(KpiCard, { title: 'Schedule Variance', value: kpis.scheduleVariance.toLocaleString('en-US'), unit: 'USD', description: 'Difference between earned & planned value', color: svColor }),
-                React.createElement(KpiCard, { title: 'Cost Variance', value: kpis.costVariance.toLocaleString('en-US'), unit: 'USD', description: 'Difference between earned value & actual cost', color: cvColor }),
+                React.createElement(KpiCard, { title: 'Schedule Variance', value: kpis.scheduleVariance.toLocaleString('en-US'), unit: currency, description: 'Difference between earned & planned value', color: svColor }),
+                React.createElement(KpiCard, { title: 'Cost Variance', value: kpis.costVariance.toLocaleString('en-US'), unit: currency, description: 'Difference between earned value & actual cost', color: cvColor }),
                 React.createElement(KpiCard, { title: 'Planned Duration', value: kpis.plannedDuration, unit: 'Days', description: 'Total scheduled project duration' }),
-                React.createElement('div', { className: 'bg-dark-card p-6 rounded-xl' }, 'Chart placeholder')
+                React.createElement('div', { className: 'bg-dark-card p-6 rounded-xl flex items-center justify-center text-slate-500 text-sm' }, 'Chart placeholder')
             )
         )
     );
@@ -103,6 +104,7 @@ const ResultsView = ({ data }) => {
 const KpiView = ({ language, projectData, onUpdateProject, isLoading, setIsLoading, error, setError }) => {
     const t = i18n[language];
     const fullscreenRef = useRef(null);
+    const currency = projectData.criteria?.currency || 'USD';
     
     useEffect(() => {
         if (projectData.schedule && projectData.budget && !projectData.kpiReport && !isLoading) {
@@ -125,7 +127,7 @@ const KpiView = ({ language, projectData, onUpdateProject, isLoading, setIsLoadi
 
     const renderContent = () => {
         if (isLoading) return React.createElement(LoadingView, null);
-        if (projectData.kpiReport) return React.createElement(ResultsView, { data: projectData.kpiReport });
+        if (projectData.kpiReport) return React.createElement(ResultsView, { data: projectData.kpiReport, currency });
         return React.createElement(LoadingView, null);
     };
 
