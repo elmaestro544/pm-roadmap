@@ -1,6 +1,7 @@
 
 
-import { PlanningIcon, RiskIcon, AgentIcon, ScheduleIcon, BudgetIcon, AssistantIcon, StructureIcon, KpiIcon, SCurveIcon, DocumentIcon } from './components/Shared.js';
+
+import { PlanningIcon, RiskIcon, ScheduleIcon, BudgetIcon, AssistantIcon, StructureIcon, KpiIcon, SCurveIcon, DocumentIcon } from './components/Shared.js';
 
 export const AppView = Object.freeze({
   Home: 'home',
@@ -22,7 +23,7 @@ export const Language = Object.freeze({
 });
 
 // Reordered to match logical project workflow: 
-// Plan -> Planning -> Scheduling -> Budget -> Risk -> Structure -> Agents -> KPIs -> S-Curve -> Assistant
+// Plan -> Planning -> Scheduling -> Budget -> Risk -> Structure -> KPIs -> S-Curve -> Assistant
 export const DASHBOARD_VIEWS = [
     { id: 'consultingPlan', titleKey: 'dashboardConsultingPlan', icon: DocumentIcon },
     { id: 'planning', titleKey: 'dashboardPlanning', icon: PlanningIcon },
@@ -30,7 +31,6 @@ export const DASHBOARD_VIEWS = [
     { id: 'budget', titleKey: 'dashboardBudget', icon: BudgetIcon },
     { id: 'risk', titleKey: 'dashboardRisk', icon: RiskIcon },
     { id: 'structure', titleKey: 'dashboardStructure', icon: StructureIcon },
-    { id: 'agents', titleKey: 'dashboardAgents', icon: AgentIcon },
     { id: 'kpis', titleKey: 'dashboardKpis', icon: KpiIcon },
     { id: 'scurve', titleKey: 'dashboardSCurve', icon: SCurveIcon },
     { id: 'assistant', titleKey: 'dashboardAssistant', icon: AssistantIcon },
@@ -65,8 +65,6 @@ export const i18n = {
     step5Desc: "Proactively identify potential risks. The system generates mitigation strategies and a risk matrix automatically.",
     step6Title: "Structure Visualization",
     step6Desc: "Visualize the hierarchical breakdown of your project components, features, or physical assets.",
-    step7Title: "AI Agents",
-    step7Desc: "Deploy autonomous agents to handle procurement, find vendor offers, and manage compliance checks.",
     step8Title: "KPI Monitoring",
     step8Desc: "Track Schedule Performance Index (SPI) and Cost Performance Index (CPI) with real-time AI analysis.",
     step9Title: "S-Curve Analysis",
@@ -162,7 +160,6 @@ export const i18n = {
     dashboardStructure: "Structure",
     dashboardRisk: "Risk Control",
     dashboardBudget: "Budget",
-    dashboardAgents: "AI Agents",
     dashboardKpis: "KPIs",
     dashboardSCurve: "S-Curve",
     // General
@@ -232,8 +229,6 @@ export const i18n = {
     step5Desc: "تحديد المخاطر المحتملة بشكل استباقي. يولد النظام استراتيجيات التخفيف ومصفوفة المخاطر تلقائيًا.",
     step6Title: "تصور الهيكل",
     step6Desc: "تصور التقسيم الهرمي لمكونات مشروعك أو ميزاته أو أصوله المادية.",
-    step7Title: "وكلاء الذكاء الاصطناعي",
-    step7Desc: "نشر وكلاء مستقلين للتعامل مع المشتريات، والعثور على عروض الموردين، وإدارة فحوصات الامتثال.",
     step8Title: "مراقبة مؤشرات الأداء",
     step8Desc: "تتبع مؤشر أداء الجدول الزمني (SPI) ومؤشر أداء التكلفة (CPI) مع تحليل الذكاء الاصطناعي في الوقت الفعلي.",
     step9Title: "تحليل منحنى S",
@@ -329,7 +324,6 @@ export const i18n = {
     dashboardStructure: "الهيكل",
     dashboardRisk: "إدارة المخاطر",
     dashboardBudget: "الميزانية",
-    dashboardAgents: "الوكلاء الأذكياء",
     dashboardKpis: "مؤشرات الأداء",
     dashboardSCurve: "منحنى S",
     // General

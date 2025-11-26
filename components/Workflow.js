@@ -1,8 +1,10 @@
 
+
+
 import React, { useState } from 'react';
 import { i18n } from '../constants.js';
 import { 
-    PlanningIcon, RiskIcon, AgentIcon, ScheduleIcon, BudgetIcon, 
+    PlanningIcon, RiskIcon, ScheduleIcon, BudgetIcon, 
     AssistantIcon, StructureIcon, KpiIcon, SCurveIcon, DocumentIcon 
 } from './Shared.js';
 
@@ -17,7 +19,6 @@ const Workflow = ({ language }) => {
         { id: 'budget', title: t.step4Title, desc: t.step4Desc, icon: BudgetIcon },
         { id: 'risk', title: t.step5Title, desc: t.step5Desc, icon: RiskIcon },
         { id: 'structure', title: t.step6Title, desc: t.step6Desc, icon: StructureIcon },
-        { id: 'agents', title: t.step7Title, desc: t.step7Desc, icon: AgentIcon },
         { id: 'kpis', title: t.step8Title, desc: t.step8Desc, icon: KpiIcon },
         { id: 'scurve', title: t.step9Title, desc: t.step9Desc, icon: SCurveIcon },
         { id: 'assistant', title: t.step10Title, desc: t.step10Desc, icon: AssistantIcon },

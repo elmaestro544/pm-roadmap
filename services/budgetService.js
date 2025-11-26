@@ -33,24 +33,39 @@ export const generateProjectBudget = async (projectDetails, criteria) => {
     let budgetConstraint = "";
     if (budgetCap) {
         if (budgetType === 'Fixed') {
-            budgetConstraint = `STRICT CONSTRAINT: The total cost (Labor + Materials + Contingency) MUST NOT exceed ${currency} ${budgetCap}. Distribute funds accordingly.`;
+            budgetConstraint = `
+            CRITICAL - FIXED BUDGET: The project has a strictly FIXED budget of ${currency} ${budgetCap}.
+            You MUST distribute funds such that the sum of (Labor Cost + Materials Cost + Contingency) across all items EQUALS EXACTLY ${budgetCap} (within 1% margin).
+            Do NOT create a budget that exceeds this amount. Allocations must fit this envelope.
+            `;
         } else {
-            budgetConstraint = `GUIDELINE: The target baseline budget is ${currency} ${budgetCap}. Use this as a reference but estimate realistically based on scope.`;
+            budgetConstraint = `
+            GUIDELINE: The target baseline budget is ${currency} ${budgetCap}. 
+            Use this as a reference point for your estimation, but you may adjust if the scope realistically requires more or less.
+            `;
         }
     } else {
-        budgetConstraint = `ESTIMATE: No budget cap provided. Estimate total costs realistically based on market rates for this scope in ${currency}.`;
+        budgetConstraint = `ESTIMATE: No budget cap provided. Estimate realistic total costs based on industry standards for this scope in ${currency}.`;
     }
 
     const prompt = `
-        Create a detailed budget breakdown.
+        Create a detailed budget breakdown for a project.
         Objectives: "${objectives}"
         Scope: "${scope}"
         Currency: ${currency}
+        
         ${budgetConstraint}
-        Generate 5-8 budget items with labor/material splits. Return JSON.
+        
+        Instructions:
+        1. Generate 5-8 distinct budget items/categories.
+        2. Provide realistic labor hours, labor costs, and material costs.
+        3. Include a contingency percentage for each item.
+        4. Ensure the currency context (${currency}) is reflected in the scale of numbers (e.g., 1 USD != 1 JPY).
+        
+        Return JSON.
     `;
 
-    const systemInstruction = "You are an expert AI Financial Analyst. Generate detailed project budgets.";
+    const systemInstruction = "You are an expert AI Financial Analyst and Project Estimator. You strictly adhere to budget constraints when specified.";
 
     try {
         const jsonText = await generateAIContent(prompt, budgetEstimationSchema, systemInstruction);

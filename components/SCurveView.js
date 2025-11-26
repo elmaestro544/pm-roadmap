@@ -1,8 +1,9 @@
+
 // components/SCurveView.js
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { generateSCurveReport } from '../services/sCurveService.js';
-import { SCurveIcon, Spinner, FeatureToolbar } from './Shared.js';
+import { SCurveIcon, Spinner, FeatureToolbar, BarChartIcon } from './Shared.js';
 import { i18n } from '../constants.js';
 
 // --- Sub-Components ---
@@ -16,7 +17,7 @@ const LoadingView = () => (
     )
 );
 
-const SVGChart = ({ data }) => {
+const SVGChart = ({ data, showBars }) => {
     const svgRef = useRef(null);
     const [tooltip, setTooltip] = useState(null);
 
@@ -82,7 +83,7 @@ const SVGChart = ({ data }) => {
                 React.createElement('line', { x1: 0, y1: chartHeight, x2: chartWidth, y2: chartHeight, className: 'stroke-slate-600' }),
                 React.createElement('line', { x1: 0, y1: 0, x2: 0, y2: chartHeight, className: 'stroke-slate-600' }),
                 React.createElement('text', { x: chartWidth / 2, y: chartHeight + 40, className: 'fill-slate-400 text-sm text-anchor-middle' }, 'Project Duration'),
-                React.createElement('text', { transform: `rotate(-90)`, x: -chartHeight / 2, y: -40, className: 'fill-slate-400 text-sm text-anchor-middle' }, 'Cumulative Progress (%)'),
+                React.createElement('text', { transform: `rotate(-90)`, x: -chartHeight / 2, y: -40, className: 'fill-slate-400 text-sm text-anchor-middle' }, 'Cumulative / Period Progress (%)'),
                 
                 // Y-Axis Ticks
                 [0, 25, 50, 75, 100].map(tick => (
@@ -92,6 +93,41 @@ const SVGChart = ({ data }) => {
                     )
                 )),
                 
+                // Optional: Incremental Bars
+                showBars && points.map((p, i) => {
+                    const x = xScale(i);
+                    const prevPlanned = i > 0 ? points[i-1].planned : 0;
+                    const prevActual = i > 0 ? points[i-1].actual : 0;
+                    
+                    const incPlanned = Math.max(0, p.planned - prevPlanned);
+                    const incActual = Math.max(0, p.actual - prevActual);
+                    
+                    const barWidth = (chartWidth / points.length) * 0.4;
+                    const offset = barWidth / 2;
+
+                    return React.createElement('g', { key: `bar-${i}` },
+                        // Incremental Planned (Transparent/Outline)
+                        React.createElement('rect', {
+                            x: x - offset - 2,
+                            y: yScale(incPlanned),
+                            width: barWidth,
+                            height: chartHeight - yScale(incPlanned),
+                            fill: 'transparent',
+                            stroke: 'rgba(14, 165, 233, 0.5)',
+                            strokeWidth: 1
+                        }),
+                        // Incremental Actual (Solid)
+                        React.createElement('rect', {
+                            x: x + 2,
+                            y: yScale(incActual),
+                            width: barWidth,
+                            height: chartHeight - yScale(incActual),
+                            fill: 'rgba(45, 212, 191, 0.3)',
+                            stroke: 'none'
+                        })
+                    );
+                }),
+
                 // X-Axis Ticks
                 Array.from({ length: getTickCount() + 1 }).map((_, i) => {
                     const tickIndex = Math.round(i * (points.length - 1) / getTickCount());
@@ -120,8 +156,8 @@ const SVGChart = ({ data }) => {
             style: { left: tooltip.x + 10, top: (tooltip.yPlanned + tooltip.yActual)/2 - 30 }
         },
             React.createElement('p', { className: 'font-bold' }, `${tooltip.point.label}`),
-            React.createElement('p', null, React.createElement('span', { className: 'text-sky-400' }, 'Planned: '), `${tooltip.point.planned}%`),
-            React.createElement('p', null, React.createElement('span', { className: 'text-brand-purple-light' }, 'Actual: '), `${tooltip.point.actual}%`)
+            React.createElement('p', null, React.createElement('span', { className: 'text-sky-400' }, 'Cumulative Planned: '), `${tooltip.point.planned}%`),
+            React.createElement('p', null, React.createElement('span', { className: 'text-brand-purple-light' }, 'Cumulative Actual: '), `${tooltip.point.actual}%`)
         )
     );
 };
@@ -163,7 +199,7 @@ const EditableDataTable = ({ data, setData }) => {
 };
 
 
-const ResultsView = ({ rawData, analysis, scale }) => {
+const ResultsView = ({ rawData, analysis, scale, showBars }) => {
     const [displayData, setDisplayData] = useState([]);
 
     useEffect(() => {
@@ -205,12 +241,33 @@ const ResultsView = ({ rawData, analysis, scale }) => {
             return;
         }
 
+        if (scale === 'quarters') {
+            const quarterlyData = [];
+            const byQuarter = rawData.points.reduce((acc, point) => {
+                const date = new Date(point.date);
+                const quarter = Math.floor(date.getMonth() / 3) + 1;
+                const year = date.getFullYear();
+                const key = `${year}-Q${quarter}`;
+                if (!acc[key]) acc[key] = [];
+                acc[key].push(point);
+                return acc;
+            }, {});
+
+            for (const qKey in byQuarter) {
+                const qPoints = byQuarter[qKey];
+                const qEndData = qPoints[qPoints.length - 1]; // Cumulative value at end of quarter
+                quarterlyData.push({ ...qEndData, label: qKey });
+            }
+            setDisplayData(quarterlyData);
+            return;
+        }
+
     }, [rawData, scale]);
 
 
     return React.createElement('div', { className: 'w-full h-full flex flex-col gap-6 animate-fade-in-up' },
         React.createElement('div', { className: 'bg-dark-card-solid p-6 rounded-xl border border-dark-border glow-border' },
-            React.createElement(SVGChart, { data: displayData })
+            React.createElement(SVGChart, { data: displayData, showBars: showBars })
         ),
         React.createElement('div', { className: 'flex-grow grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[300px]' },
             React.createElement('div', { className: 'bg-dark-card-solid p-6 rounded-xl border border-dark-border glow-border' },
@@ -237,6 +294,7 @@ const SCurveView = ({ language, projectData, onUpdateProject, isLoading, setIsLo
     const t = i18n[language];
     const fullscreenRef = useRef(null);
     const [scale, setScale] = useState('days');
+    const [showBars, setShowBars] = useState(false);
 
     useEffect(() => {
         if (projectData.schedule && !projectData.sCurveReport && !isLoading) {
@@ -260,12 +318,28 @@ const SCurveView = ({ language, projectData, onUpdateProject, isLoading, setIsLo
         if (isLoading) return React.createElement(LoadingView, null);
         if (projectData.sCurveReport) {
             const { sCurveData, analysis } = projectData.sCurveReport;
-            return React.createElement(ResultsView, { rawData: sCurveData, analysis: analysis, scale: scale });
+            return React.createElement(ResultsView, { rawData: sCurveData, analysis: analysis, scale: scale, showBars: showBars });
         }
         return React.createElement(LoadingView, null);
     };
 
+    const customControls = (
+        React.createElement('button', {
+            onClick: () => setShowBars(!showBars),
+            className: `p-2 rounded-md transition-colors ${showBars ? 'bg-brand-purple text-white' : 'text-brand-text-light hover:bg-white/10 hover:text-white'}`,
+            title: "Toggle Period Bars"
+        }, React.createElement(BarChartIcon, { className: "h-5 w-5" }))
+    );
+
     return React.createElement('div', { ref: fullscreenRef, className: "h-full flex flex-col text-white bg-dark-card printable-container" },
+        React.createElement(FeatureToolbar, {
+            title: t.dashboardSCurve,
+            containerRef: fullscreenRef,
+            onExport: () => window.print(),
+            scale: scale,
+            onScaleChange: setScale,
+            customControls: customControls
+        }),
         React.createElement('div', { className: 'flex-grow min-h-0 overflow-y-auto' },
             React.createElement('div', {
                className: 'p-6 printable-content h-full flex flex-col',

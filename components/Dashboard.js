@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect } from 'react';
 import { i18n, DASHBOARD_VIEWS } from '../constants.js';
 import AssistantView from './SciGeniusChat.js';
@@ -9,7 +10,6 @@ import PlanningView from './PlanningView.js';
 import SchedulingView from './SchedulingView.js';
 import RiskView from './RiskView.js';
 import BudgetView from './BudgetView.js';
-import AgentView from './AgentView.js';
 import StructureView from './StructureView.js';
 import KpiView from './KpiView.js';
 import SCurveView from './SCurveView.js';
@@ -18,7 +18,7 @@ import { UserIcon, SidebarToggleIcon, Logo, Spinner, HistoryIcon, PlusIcon, Chev
 import { getUserProjects, getProjectDetails, saveProject } from '../services/supabaseClient.js';
 
 // Updated workflow order to match DASHBOARD_VIEWS in constants.js
-const WORKFLOW_ORDER = ['consultingPlan', 'planning', 'scheduling', 'budget', 'risk', 'structure', 'agents', 'kpis', 'scurve', 'assistant'];
+const WORKFLOW_ORDER = ['consultingPlan', 'planning', 'scheduling', 'budget', 'risk', 'structure', 'kpis', 'scurve', 'assistant'];
 
 const PREREQUISITES = {
     planning: 'objective', // Planning needs an objective (which comes from Consulting Plan or manual entry)
@@ -26,7 +26,6 @@ const PREREQUISITES = {
     budget: 'objective',
     risk: 'objective',
     structure: 'objective',
-    agents: 'objective',
     kpis: 'budget', // also needs schedule, but budget is a good gate
     scurve: 'schedule',
 };
@@ -74,6 +73,7 @@ const ProjectHeader = ({ language, objective, onReset, onNext, onPrev, activeVie
 
 const Sidebar = ({ language, activeView, setActiveView, isExpanded, setExpanded, onLogout, currentUser, projectData, onSelectProject, projects }) => {
     const t = i18n[language];
+    const criteria = projectData?.criteria;
 
     const getButtonClasses = (isActive, isDisabled) => {
         const baseClasses = `w-full flex items-center gap-4 text-left rounded-lg transition-all duration-200 ease-in-out relative`;
@@ -94,9 +94,20 @@ const Sidebar = ({ language, activeView, setActiveView, isExpanded, setExpanded,
         };
     };
 
+    const formatCompactCurrency = (val, currency) => {
+        if (!val) return '';
+        return new Intl.NumberFormat('en-US', { 
+            style: 'currency', 
+            currency: currency || 'USD', 
+            notation: "compact", 
+            maximumFractionDigits: 1 
+        }).format(val);
+    };
+
     return React.createElement('aside', {
         className: `relative flex-shrink-0 bg-dark-card-solid flex flex-col transition-all duration-300 ease-in-out sidebar-glow border-r border-dark-border ${isExpanded ? 'w-72' : 'w-20'}`
     },
+        // Navigation Menu
         React.createElement('div', { className: 'flex-grow p-4 space-y-2 overflow-y-auto mt-4' },
             DASHBOARD_VIEWS.map(view => {
                 const Icon = view.icon;
@@ -121,6 +132,32 @@ const Sidebar = ({ language, activeView, setActiveView, isExpanded, setExpanded,
             })
         ),
         
+        // Project Parameters Widget (Visible only when expanded and data exists)
+        isExpanded && criteria && React.createElement('div', { className: 'px-6 py-4 mx-2 mb-2 bg-dark-card border border-dark-border rounded-xl' },
+            React.createElement('h4', { className: 'text-xs font-bold text-brand-purple-light uppercase mb-3 tracking-wider border-b border-dark-border pb-2' }, "Project Parameters"),
+            React.createElement('div', { className: 'space-y-2 text-xs' },
+                React.createElement('div', { className: 'flex justify-between items-center' },
+                    React.createElement('span', { className: 'text-brand-text-light' }, "Location"),
+                    React.createElement('span', { className: 'text-white font-medium truncate max-w-[100px]', title: criteria.location }, criteria.location || '-')
+                ),
+                React.createElement('div', { className: 'flex justify-between items-center' },
+                    React.createElement('span', { className: 'text-brand-text-light' }, "Duration"),
+                    React.createElement('span', { className: 'text-white font-medium' }, criteria.duration ? `${criteria.duration} Months` : '-')
+                ),
+                React.createElement('div', { className: 'flex justify-between items-center' },
+                    React.createElement('span', { className: 'text-brand-text-light' }, "Budget Type"),
+                    React.createElement('span', { className: `font-medium ${criteria.budgetType === 'Fixed' ? 'text-brand-pink' : 'text-brand-cyan'}` }, criteria.budgetType || '-')
+                ),
+                React.createElement('div', { className: 'pt-2 mt-2 border-t border-dark-border/50 flex justify-between items-end' },
+                    React.createElement('span', { className: 'text-brand-text-light font-semibold' }, "Total"),
+                    React.createElement('span', { className: 'text-white font-bold font-mono text-sm' }, 
+                        criteria.budget ? formatCompactCurrency(criteria.budget, criteria.currency) : 'N/A'
+                    )
+                )
+            )
+        ),
+
+        // Collapse Button
         React.createElement('div', { className: 'p-4 border-t border-dark-border' },
             React.createElement('button', {
                 onClick: () => setExpanded(!isExpanded),
@@ -168,8 +205,17 @@ const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick, ini
                         kpiReport: data.kpis,
                         sCurveReport: data.s_curve,
                         consultingPlan: data.consulting_plan,
-                        agents: data.agents
+                        agents: data.agents, // Kept for data integrity, though view is removed
+                        // Ensure criteria is loaded if it exists in the DB plan or derived
+                        criteria: data.consulting_plan ? {
+                            ...data.consulting_plan?.meta_criteria 
+                        } : null
                     });
+                    
+                    if (data.consulting_plan?.criteria) {
+                        setProjectData(prev => ({ ...prev, criteria: data.consulting_plan.criteria }));
+                    }
+
                     setCurrentProjectId(data.id);
                     setProjectTitle(data.title);
                     setActiveView('consultingPlan');
@@ -196,8 +242,12 @@ const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick, ini
     
     // Auto-save to Supabase
     try {
-        // Only save if there's substantial data (objective or consulting plan title)
+        // Only save if there's substantial data
         if (updatedData.objective || updatedData.consultingPlan?.projectTitle) {
+            if (newData.criteria && updatedData.consultingPlan) {
+                updatedData.consultingPlan.criteria = newData.criteria;
+            }
+            
             const savedProject = await saveProject(currentProjectId, updatedData);
             if (savedProject) {
                 setCurrentProjectId(savedProject.id);
@@ -270,8 +320,6 @@ const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick, ini
             return React.createElement(RiskView, commonProps);
         case 'budget':
             return React.createElement(BudgetView, commonProps);
-        case 'agents':
-            return React.createElement(AgentView, commonProps);
         default:
              return React.createElement(PlanningView, commonProps);
     }

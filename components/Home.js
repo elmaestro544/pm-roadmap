@@ -1,8 +1,10 @@
 
 
+
+
 import React, { useState, useEffect } from 'react';
 import { i18n, AppView } from '../constants.js';
-import { PlanningIcon, RiskIcon, BudgetIcon, AgentIcon, ScheduleIcon, CheckIcon, CloseIcon } from './Shared.js';
+import { PlanningIcon, RiskIcon, BudgetIcon, ScheduleIcon, CheckIcon, CloseIcon } from './Shared.js';
 
 // --- Feature Modal Component (New) ---
 const FeatureModal = ({ feature, onClose, language }) => {

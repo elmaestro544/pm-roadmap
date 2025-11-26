@@ -28,71 +28,16 @@ const formatDate = (dateStr) => {
 
 const LoadingView = () => (
     React.createElement('div', { className: 'text-center flex flex-col items-center h-full justify-center' },
-        React.createElement(ScheduleIcon, { className: 'h-16 w-16 animate-pulse text-slate-500' }),
+        React.createElement(ScheduleIcon, { className: 'h-16 w-16 animate-pulse text-brand-purple-light' }),
         React.createElement('h2', { className: 'text-3xl font-bold mt-4 mb-2 text-white' }, "Building Schedule..."),
         React.createElement('p', { className: 'text-brand-text-light mb-8' }, "AI is calculating critical paths, dependencies, and timelines."),
         React.createElement(Spinner, { size: '12' })
     )
 );
 
-const TaskListRow = ({ task, indent, isExpanded, onToggle, isEditing, onUpdate }) => {
-    const isProject = task.type === 'project';
-    
-    return React.createElement('div', { 
-        className: `flex items-center h-10 border-b border-dark-border hover:bg-white/5 transition-colors print:border-gray-200 print:h-8 ${isProject ? 'bg-dark-card-solid font-semibold print:bg-gray-100' : ''}` 
-    },
-        React.createElement('div', { className: 'flex-grow min-w-0 px-4 flex items-center gap-2 overflow-hidden' },
-            React.createElement('div', { style: { width: indent * 20 } }), // Indentation
-            isProject && React.createElement('button', { 
-                onClick: () => onToggle(task.id),
-                className: 'p-0.5 hover:text-white text-brand-text-light focus:outline-none print:text-black'
-            }, isExpanded ? '▼' : '▶'),
-            isEditing ? (
-                React.createElement('input', {
-                    value: task.name,
-                    onChange: (e) => onUpdate(task.id, 'name', e.target.value),
-                    className: "bg-dark-bg border border-dark-border rounded px-2 py-0.5 text-sm text-white w-full focus:ring-1 focus:ring-brand-purple outline-none"
-                })
-            ) : (
-                React.createElement('span', { className: `truncate text-sm ${isProject ? 'text-white print:text-black' : 'text-brand-text-light print:text-gray-800'}` }, task.name)
-            )
-        ),
-        React.createElement('div', { className: 'w-24 flex-shrink-0 px-2 text-xs text-right text-brand-text-light print:text-black border-l border-dark-border print:border-gray-300 h-full flex items-center justify-end' },
-             isEditing ? (
-                React.createElement('input', {
-                    type: 'date',
-                    value: task.start,
-                    onChange: (e) => onUpdate(task.id, 'start', e.target.value),
-                    className: "bg-transparent text-white text-right w-full outline-none"
-                })
-             ) : formatDate(task.start)
-        ),
-        React.createElement('div', { className: 'w-24 flex-shrink-0 px-2 text-xs text-right text-brand-text-light print:text-black border-l border-dark-border print:border-gray-300 h-full flex items-center justify-end' },
-             isEditing ? (
-                React.createElement('input', {
-                    type: 'date',
-                    value: task.end,
-                    onChange: (e) => onUpdate(task.id, 'end', e.target.value),
-                    className: "bg-transparent text-white text-right w-full outline-none"
-                })
-             ) : formatDate(task.end)
-        ),
-        React.createElement('div', { className: 'w-16 flex-shrink-0 px-2 text-xs text-right text-brand-text-light print:text-black border-l border-dark-border print:border-gray-300 h-full flex items-center justify-end' },
-             isEditing ? (
-                React.createElement('input', {
-                    type: 'number',
-                    min: 0, max: 100,
-                    value: task.progress,
-                    onChange: (e) => onUpdate(task.id, 'progress', parseInt(e.target.value)),
-                    className: "bg-transparent text-white text-right w-full outline-none"
-                })
-             ) : `${task.progress}%`
-        )
-    );
-};
-
+// --- Timeline View with Synchronized Scroll ---
 const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpdate }) => {
-    // --- Data Preparation ---
+    // 1. Data Preparation
     const dates = useMemo(() => {
         if (!tasks.length) return { start: new Date(), end: new Date(), totalDays: 0 };
         const startDates = tasks.map(t => new Date(t.start));
@@ -113,40 +58,45 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
     const periods = useMemo(() => {
         const result = [];
         const current = new Date(dates.start);
+        
+        // Limit the loop to prevent crashes on huge ranges
+        const safetyLimit = 1000; 
+        let count = 0;
+
         if (scale === 'days') {
             for (let i = 0; i <= dates.totalDays; i++) {
                 result.push(new Date(current));
                 current.setDate(current.getDate() + 1);
             }
         } else if (scale === 'weeks') {
-             // Align to Monday
              const day = current.getDay();
              const diff = current.getDate() - day + (day === 0 ? -6 : 1); 
              current.setDate(diff);
-             while (current <= dates.end) {
+             while (current <= dates.end && count < safetyLimit) {
                  result.push(new Date(current));
                  current.setDate(current.getDate() + 7);
+                 count++;
              }
         } else if (scale === 'months') {
             current.setDate(1);
-            while (current <= dates.end) {
+            while (current <= dates.end && count < safetyLimit) {
                 result.push(new Date(current));
                 current.setMonth(current.getMonth() + 1);
+                count++;
             }
         } else if (scale === 'quarters') {
-            // Align to start of quarter (Jan, Apr, Jul, Oct)
             const qMonth = Math.floor(current.getMonth() / 3) * 3;
             current.setMonth(qMonth);
             current.setDate(1);
-            while (current <= dates.end) {
+            while (current <= dates.end && count < safetyLimit) {
                 result.push(new Date(current));
                 current.setMonth(current.getMonth() + 3);
+                count++;
             }
         }
         return result;
     }, [dates, scale]);
 
-    // Flatten Hierarchy for Display
     const visibleTasks = useMemo(() => {
         const result = [];
         tasks.forEach(task => {
@@ -184,99 +134,127 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
     };
 
     const totalWidth = periods.length * colWidth;
+    const taskListWidth = 300; // Fixed width for sticky column
 
-    return React.createElement('div', { className: 'flex h-full bg-dark-bg border border-dark-border rounded-xl overflow-hidden print:border-none print:bg-white' },
-        // Left Panel: Task List
-        React.createElement('div', { className: 'w-80 flex-shrink-0 flex flex-col border-r border-dark-border bg-dark-card print:border-gray-300 print:bg-white' },
-            React.createElement('div', { className: 'h-12 bg-dark-card-solid border-b border-dark-border flex items-center px-4 text-sm font-bold text-brand-text-light print:bg-gray-100 print:text-black print:border-gray-300' }, "Task Name"),
-            React.createElement('div', { className: 'flex-grow overflow-y-hidden hover:overflow-y-auto' },
-                visibleTasks.map(task => 
-                    React.createElement(TaskListRow, { 
-                        key: task.id, 
-                        task, 
-                        indent: task.level, 
-                        isExpanded: expanded.has(task.id), 
-                        onToggle: onToggle,
-                        isEditing,
-                        onUpdate
-                    })
-                )
-            )
-        ),
-        
-        // Right Panel: Timeline
-        React.createElement('div', { className: 'flex-grow flex flex-col overflow-x-auto relative' },
-            // Header Dates
-            React.createElement('div', { className: 'h-12 bg-dark-card-solid border-b border-dark-border flex relative print:bg-gray-100 print:border-gray-300', style: { width: totalWidth } },
-                periods.map((p, i) => 
-                    React.createElement('div', { 
-                        key: i, 
-                        className: 'flex-shrink-0 border-r border-dark-border px-2 py-3 text-xs text-brand-text-light print:text-black print:border-gray-300 font-medium truncate',
-                        style: { width: colWidth }
-                    }, 
-                        scale === 'days' ? p.getDate() : 
-                        scale === 'quarters' ? `Q${Math.floor(p.getMonth() / 3) + 1} ${p.getFullYear()}` :
-                        p.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                    )
-                )
-            ),
+    return React.createElement('div', { className: 'h-full w-full overflow-auto bg-dark-bg relative border border-dark-border rounded-xl scrollbar-thin' },
+        React.createElement('div', { className: 'min-w-fit flex flex-col relative' },
             
-            // Grid & Bars Container
-            React.createElement('div', { className: 'relative flex-grow min-h-0 overflow-y-auto', style: { width: totalWidth } },
-                // 1. Full Height Grid Lines Layer
-                React.createElement('div', { className: 'absolute inset-0 pointer-events-none flex', style: { height: `${Math.max(100, visibleTasks.length * 40)}px`, minHeight: '100%' } }, 
+            // --- Header Row (Sticky Top) ---
+            React.createElement('div', { className: 'flex sticky top-0 z-30 bg-dark-card-solid border-b border-dark-border h-12' },
+                // Top Left Corner (Sticky Top & Left)
+                React.createElement('div', { 
+                    className: 'sticky left-0 z-40 w-[300px] flex-shrink-0 bg-dark-card-solid border-r border-dark-border flex items-center px-4 font-bold text-brand-text shadow-md',
+                    style: { minWidth: taskListWidth, width: taskListWidth }
+                }, "Task Name"),
+                
+                // Timeline Dates Header
+                React.createElement('div', { className: 'flex' },
                     periods.map((p, i) => 
                         React.createElement('div', { 
                             key: i, 
-                            className: 'flex-shrink-0 border-r border-dark-border/30 print:border-gray-200 h-full',
+                            className: 'flex-shrink-0 border-r border-dark-border px-2 py-3 text-xs text-brand-text-light font-medium truncate flex items-center justify-center',
                             style: { width: colWidth }
-                        })
-                    )
-                ),
-
-                // 2. Task Rows Layer
-                visibleTasks.map((task, index) => {
-                    const left = getLeftPos(task.start);
-                    const width = getWidth(task.start, task.end);
-                    const isProject = task.type === 'project';
-                    const barColor = isProject ? 'bg-brand-purple' : (task.progress === 100 ? 'bg-green-500' : 'bg-sky-500');
-                    
-                    return React.createElement('div', { key: task.id, className: 'relative h-10 w-full hover:bg-white/5 transition-colors print:h-8' },
-                        React.createElement('div', {
-                            className: `absolute top-2 h-6 rounded-md shadow-sm flex items-center px-2 text-[10px] text-white whitespace-nowrap overflow-hidden print:h-5 print:text-xs ${barColor} print:print-color-exact`,
-                            style: { left: left, width: width }
                         }, 
-                            width > 40 && `${task.progress}%`
+                            scale === 'days' ? p.getDate() : 
+                            scale === 'quarters' ? `Q${Math.floor(p.getMonth() / 3) + 1} ${p.getFullYear()}` :
+                            p.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                         )
-                    );
-                })
-            )
+                    )
+                )
+            ),
+
+            // --- Body Grid ---
+            // Background Grid Lines (Absolute to body)
+            React.createElement('div', { className: 'absolute top-12 bottom-0 left-[300px] flex pointer-events-none z-0' },
+                periods.map((p, i) => 
+                    React.createElement('div', { 
+                        key: i, 
+                        className: 'flex-shrink-0 border-r border-dark-border/30 h-full',
+                        style: { width: colWidth }
+                    })
+                )
+            ),
+
+            // Rows
+            visibleTasks.map(task => {
+                const isProject = task.type === 'project';
+                const left = getLeftPos(task.start);
+                const width = getWidth(task.start, task.end);
+                
+                return React.createElement('div', { key: task.id, className: 'flex h-10 hover:bg-white/5 transition-colors relative group' },
+                    
+                    // Task List Column (Sticky Left)
+                    React.createElement('div', { 
+                        className: `sticky left-0 z-20 w-[300px] flex-shrink-0 border-r border-dark-border flex items-center px-4 gap-2 overflow-hidden shadow-md ${isProject ? 'bg-dark-card-solid' : 'bg-dark-card'}`,
+                        style: { minWidth: taskListWidth, width: taskListWidth }
+                    },
+                        React.createElement('div', { style: { width: task.level * 20 } }), // Indentation
+                        isProject && React.createElement('button', { 
+                            onClick: () => onToggle(task.id),
+                            className: 'p-0.5 hover:text-white text-brand-purple-light focus:outline-none'
+                        }, expanded.has(task.id) ? '▼' : '▶'),
+                        React.createElement('span', { className: `truncate text-sm font-medium ${isProject ? 'text-white' : 'text-brand-text-light'}` }, task.name)
+                    ),
+
+                    // Timeline Bar Area
+                    React.createElement('div', { className: 'relative flex-grow z-10' },
+                        React.createElement('div', {
+                            className: `absolute top-2 h-6 rounded-md shadow-sm text-[10px] text-white whitespace-nowrap overflow-hidden flex items-center`,
+                            style: { 
+                                left: left, 
+                                width: width,
+                                // Background Track Color
+                                backgroundColor: isProject ? '#2DD4BF' : 'rgba(45, 212, 191, 0.15)', 
+                            }
+                        },
+                            // Progress Fill (The actual percentage)
+                            !isProject && React.createElement('div', {
+                                className: 'h-full bg-gradient-to-r from-brand-purple to-brand-purple-light absolute left-0 top-0 rounded-l-md transition-all duration-500',
+                                style: { width: `${task.progress}%` }
+                            }),
+                            
+                            // Label
+                            React.createElement('span', { className: `relative z-10 px-2 ${isProject ? 'font-bold' : ''}` },
+                                width > 40 ? `${task.progress}%` : ''
+                            )
+                        )
+                    )
+                )
+            })
         )
     );
 };
 
-const BoardView = ({ tasks, onUpdate }) => {
+const BoardView = ({ tasks }) => {
     const columns = [
         { id: 'todo', label: 'To Do', statusCheck: t => t.progress === 0 },
         { id: 'in-progress', label: 'In Progress', statusCheck: t => t.progress > 0 && t.progress < 100 },
         { id: 'done', label: 'Done', statusCheck: t => t.progress === 100 },
     ];
 
-    return React.createElement('div', { className: 'flex gap-4 h-full overflow-x-auto p-2' },
+    return React.createElement('div', { className: 'flex gap-4 h-full overflow-x-auto p-4' },
         columns.map(col => {
             const colTasks = tasks.filter(t => t.type !== 'project' && col.statusCheck(t));
             return React.createElement('div', { key: col.id, className: 'flex-shrink-0 w-80 bg-dark-card-solid rounded-xl border border-dark-border flex flex-col' },
-                React.createElement('div', { className: 'p-4 font-bold text-white border-b border-dark-border flex justify-between' },
+                React.createElement('div', { className: 'p-4 font-bold text-white border-b border-dark-border flex justify-between items-center' },
                     col.label,
-                    React.createElement('span', { className: 'bg-dark-bg px-2 py-0.5 rounded text-xs text-brand-text-light' }, colTasks.length)
+                    React.createElement('span', { className: 'bg-dark-bg px-2 py-0.5 rounded text-xs text-brand-text-light border border-dark-border' }, colTasks.length)
                 ),
                 React.createElement('div', { className: 'flex-grow overflow-y-auto p-3 space-y-3' },
                     colTasks.map(task => 
-                        React.createElement('div', { key: task.id, className: 'bg-dark-card p-3 rounded-lg border border-dark-border shadow-sm hover:border-brand-purple/50 transition-colors' },
-                            React.createElement('p', { className: 'font-semibold text-white text-sm' }, task.name),
-                            React.createElement('div', { className: 'flex justify-between mt-2 text-xs text-brand-text-light' },
-                                React.createElement('span', null, formatDate(task.end)),
-                                React.createElement('span', { className: task.progress === 100 ? 'text-green-400' : 'text-sky-400' }, `${task.progress}%`)
+                        React.createElement('div', { key: task.id, className: 'bg-dark-card p-4 rounded-lg border border-dark-border shadow-sm hover:border-brand-purple/50 transition-colors group cursor-pointer' },
+                            React.createElement('p', { className: 'font-semibold text-white text-sm mb-2 group-hover:text-brand-purple-light transition-colors' }, task.name),
+                            React.createElement('div', { className: 'flex justify-between items-center text-xs text-brand-text-light' },
+                                React.createElement('span', { className: 'flex items-center gap-1' }, 
+                                    React.createElement('span', {className: "opacity-50"}, "Due:"), 
+                                    formatDate(task.end)
+                                ),
+                                React.createElement('div', { className: 'flex items-center gap-1' },
+                                    React.createElement('div', { className: 'w-16 h-1.5 bg-dark-bg rounded-full overflow-hidden' },
+                                        React.createElement('div', { className: 'h-full bg-brand-purple', style: { width: `${task.progress}%` } })
+                                    ),
+                                    React.createElement('span', null, `${task.progress}%`)
+                                )
                             )
                         )
                     )
