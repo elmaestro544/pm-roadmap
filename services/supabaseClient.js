@@ -1,38 +1,45 @@
+
 import { createClient } from '@supabase/supabase-js';
 
 // Helper to retrieve environment variables from various sources (Vite, Process, Window)
 export const getEnv = (key) => {
+    let val = '';
     // 1. Check import.meta.env (Vite/Modern ESM)
     try {
         if (typeof import.meta !== 'undefined' && import.meta.env) {
-            if (import.meta.env[key]) return import.meta.env[key];
-            if (import.meta.env[`VITE_${key}`]) return import.meta.env[`VITE_${key}`];
+            if (import.meta.env[key]) val = import.meta.env[key];
+            else if (import.meta.env[`VITE_${key}`]) val = import.meta.env[`VITE_${key}`];
         }
     } catch (e) {}
 
     // 2. Check process.env (Node/Webpack/Browserify)
-    try {
-        if (typeof process !== 'undefined' && process.env) {
-            if (process.env[key]) return process.env[key];
-            if (process.env[`REACT_APP_${key}`]) return process.env[`REACT_APP_${key}`];
-            if (process.env[`NEXT_PUBLIC_${key}`]) return process.env[`NEXT_PUBLIC_${key}`];
-        }
-    } catch (e) {}
+    if (!val) {
+        try {
+            if (typeof process !== 'undefined' && process.env) {
+                if (process.env[key]) val = process.env[key];
+                else if (process.env[`REACT_APP_${key}`]) val = process.env[`REACT_APP_${key}`];
+                else if (process.env[`NEXT_PUBLIC_${key}`]) val = process.env[`NEXT_PUBLIC_${key}`];
+            }
+        } catch (e) {}
+    }
 
     // 3. Check window/runtime injection (Legacy env.js or Docker entrypoint scripts)
-    try {
-        if (typeof window !== 'undefined' && window.process?.env) {
-            // Direct match
-            if (window.process.env[key]) return window.process.env[key];
-            // Check for VITE_ prefix match in window.process.env
-            if (window.process.env[`VITE_${key}`]) return window.process.env[`VITE_${key}`];
-            
-            // Check legacy _env_ object
-            if (window._env_?.[key]) return window._env_[key];
-        }
-    } catch (e) {}
+    if (!val) {
+        try {
+            if (typeof window !== 'undefined' && window.process?.env) {
+                if (window.process.env[key]) val = window.process.env[key];
+                else if (window.process.env[`VITE_${key}`]) val = window.process.env[`VITE_${key}`];
+                else if (window._env_?.[key]) val = window._env_[key];
+            }
+        } catch (e) {}
+    }
 
-    return '';
+    // CRITICAL FIX: Ignore placeholders that haven't been replaced
+    if (val && typeof val === 'string' && val.startsWith('__VITE_')) {
+        return '';
+    }
+
+    return val || '';
 };
 
 const supabaseUrl = getEnv('SUPABASE_URL');

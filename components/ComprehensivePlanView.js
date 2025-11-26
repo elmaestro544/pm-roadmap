@@ -1,8 +1,7 @@
 
-
 import React, { useState, useRef, useEffect } from 'react';
 import { generateConsultingPlan } from '../services/comprehensivePlanService.js';
-import { DocumentIcon, Spinner, FeatureToolbar } from './Shared.js';
+import { DocumentIcon, Spinner, FeatureToolbar, EditIcon } from './Shared.js';
 import { i18n } from '../constants.js';
 
 // --- Markdown Renderer ---
@@ -104,14 +103,15 @@ const MarkdownRenderer = ({ content }) => {
 
 // --- Views ---
 
-const InputView = ({ onGenerate, isLoading, error }) => {
-    const [formData, setFormData] = useState({
+const InputView = ({ onGenerate, initialData, isLoading, error }) => {
+    const [formData, setFormData] = useState(initialData || {
         field: '',
         name: '',
         scope: '',
         location: '',
         budget: '',
         currency: 'USD',
+        budgetType: 'Fixed', // Fixed vs Predicted
         duration: ''
     });
 
@@ -146,7 +146,32 @@ const InputView = ({ onGenerate, isLoading, error }) => {
         "Global / Remote"
     ];
     
+    const locationCurrencyMap = {
+        "Saudi Arabia": "SAR",
+        "United Arab Emirates": "AED",
+        "Egypt": "EGP",
+        "Qatar": "QAR",
+        "Kuwait": "KWD",
+        "Bahrain": "BHD",
+        "Oman": "OMR",
+        "United States": "USD",
+        "United Kingdom": "GBP",
+        "Canada": "CAD",
+        "Germany": "EUR",
+        "France": "EUR",
+        "Global / Remote": "USD"
+    };
+    
     const currencies = ["USD", "EUR", "GBP", "SAR", "AED", "EGP", "KWD", "QAR", "OMR", "BHD", "INR", "CNY", "JPY"];
+
+    // Smart Currency switching
+    useEffect(() => {
+        // Only switch if currency hasn't been manually changed yet (simple check: matches default USD or previous map)
+        // For better UX, we just switch it when location changes, user can override back.
+        if (formData.location && locationCurrencyMap[formData.location]) {
+            setFormData(prev => ({ ...prev, currency: locationCurrencyMap[formData.location] }));
+        }
+    }, [formData.location]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -158,7 +183,7 @@ const InputView = ({ onGenerate, isLoading, error }) => {
     return React.createElement('div', { className: 'max-w-3xl mx-auto animate-fade-in-up' },
         React.createElement('div', { className: 'text-center mb-8' },
             React.createElement(DocumentIcon, { className: 'h-16 w-16 text-brand-purple-light mx-auto mb-4' }),
-            React.createElement('h2', { className: 'text-3xl font-bold text-white' }, "Project Management Plan"),
+            React.createElement('h2', { className: 'text-3xl font-bold text-white' }, initialData ? "Update Project Criteria" : "Project Management Plan"),
             React.createElement('p', { className: 'text-brand-text-light mt-2' }, "Generate a comprehensive, professional project plan aligned with international standards (PMI, ISO) and local regulations.")
         ),
         React.createElement('div', { className: 'bg-dark-card-solid p-6 rounded-xl border border-dark-border space-y-4' },
@@ -213,19 +238,21 @@ const InputView = ({ onGenerate, isLoading, error }) => {
                     )
                 ),
                  React.createElement('div', null,
-                    React.createElement('label', { className: 'block text-sm font-medium text-brand-text-light mb-1' }, "Duration Constraint"),
+                    React.createElement('label', { className: 'block text-sm font-medium text-brand-text-light mb-1' }, "Duration (Months)"),
                     React.createElement('input', {
                         name: 'duration',
+                        type: 'number',
+                        min: '1',
                         value: formData.duration,
                         onChange: handleChange,
-                        placeholder: "e.g., 18 months, 2 years...",
+                        placeholder: "e.g., 18",
                         className: 'w-full p-3 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none'
                     })
                 )
             ),
             React.createElement('div', null,
-                React.createElement('label', { className: 'block text-sm font-medium text-brand-text-light mb-1' }, "Total Budget (Optional)"),
-                React.createElement('div', { className: 'flex gap-2' },
+                React.createElement('label', { className: 'block text-sm font-medium text-brand-text-light mb-1' }, "Total Budget"),
+                React.createElement('div', { className: 'flex gap-2 mb-2' },
                     React.createElement('input', {
                         name: 'budget',
                         type: 'number',
@@ -240,6 +267,31 @@ const InputView = ({ onGenerate, isLoading, error }) => {
                         onChange: handleChange,
                         className: 'w-24 p-3 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none font-bold'
                     }, currencies.map(c => React.createElement('option', { key: c, value: c }, c)))
+                ),
+                // Budget Type Toggles
+                React.createElement('div', { className: 'flex gap-4' },
+                    React.createElement('label', { className: 'flex items-center gap-2 cursor-pointer' },
+                        React.createElement('input', {
+                            type: 'radio',
+                            name: 'budgetType',
+                            value: 'Fixed',
+                            checked: formData.budgetType === 'Fixed',
+                            onChange: handleChange,
+                            className: 'w-4 h-4 text-brand-purple bg-dark-bg border-dark-border focus:ring-brand-purple'
+                        }),
+                        React.createElement('span', { className: 'text-sm text-brand-text-light' }, "Fixed Budget")
+                    ),
+                    React.createElement('label', { className: 'flex items-center gap-2 cursor-pointer' },
+                        React.createElement('input', {
+                            type: 'radio',
+                            name: 'budgetType',
+                            value: 'Predicted',
+                            checked: formData.budgetType === 'Predicted',
+                            onChange: handleChange,
+                            className: 'w-4 h-4 text-brand-purple bg-dark-bg border-dark-border focus:ring-brand-purple'
+                        }),
+                        React.createElement('span', { className: 'text-sm text-brand-text-light' }, "Predicted / Estimate")
+                    )
                 )
             ),
             error && React.createElement('div', { className: "bg-red-500/10 border border-red-500/30 text-center p-2 rounded-md text-sm text-red-400 font-semibold" }, error),
@@ -247,7 +299,7 @@ const InputView = ({ onGenerate, isLoading, error }) => {
                 onClick: () => onGenerate(formData),
                 disabled: isLoading || !isFormValid,
                 className: "w-full py-3 mt-2 font-semibold text-white bg-button-gradient rounded-lg shadow-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-            }, isLoading ? React.createElement(Spinner, { size: '6' }) : "Generate Plan")
+            }, isLoading ? React.createElement(Spinner, { size: '6' }) : (initialData ? "Regenerate Plan" : "Generate Plan"))
         )
     );
 };
@@ -264,18 +316,30 @@ const LoadingView = () => (
 const SectionCard = ({ title, content }) => (
     React.createElement('div', { className: 'bg-dark-card-solid print:bg-white p-8 rounded-xl border border-dark-border print:border-none glow-border print:shadow-none mb-8 break-inside-avoid' },
         React.createElement('h3', { className: 'text-2xl font-bold text-white print:text-black mb-6 border-b border-dark-border print:border-black pb-3 uppercase tracking-wider' }, title),
-        React.createElement(MarkdownRenderer, { content: content })
+        React.createElement(MarkdownRenderer, { content: content || "Content pending generation..." })
     )
 );
 
-const ResultsView = ({ plan, onReset }) => {
+const ResultsView = ({ plan, criteria, onReset, onEdit }) => {
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
     return React.createElement('div', { className: 'animate-fade-in-up max-w-5xl mx-auto' },
         // Header Controls (Non-printable)
-        React.createElement('div', { className: 'flex justify-between items-center mb-8 non-printable' },
-            React.createElement('h2', { className: 'text-xl font-bold text-white' }, "Project Management Plan"),
+        React.createElement('div', { className: 'flex justify-between items-start mb-8 non-printable' },
+            React.createElement('div', null,
+                React.createElement('h2', { className: 'text-xl font-bold text-white' }, "Project Management Plan"),
+                // Criteria Summary
+                criteria && React.createElement('div', { className: 'flex flex-wrap gap-3 mt-2 text-xs text-brand-text-light' },
+                    React.createElement('span', { className: 'bg-dark-card-solid px-2 py-1 rounded border border-dark-border' }, `Location: ${criteria.location}`),
+                    criteria.budget && React.createElement('span', { className: 'bg-dark-card-solid px-2 py-1 rounded border border-dark-border' }, `Budget: ${criteria.currency} ${criteria.budget} (${criteria.budgetType || 'Fixed'})`),
+                    criteria.duration && React.createElement('span', { className: 'bg-dark-card-solid px-2 py-1 rounded border border-dark-border' }, `Duration: ${criteria.duration} Months`)
+                )
+            ),
             React.createElement('div', { className: 'flex gap-3' },
+                 React.createElement('button', {
+                    onClick: onEdit,
+                    className: 'px-4 py-2 text-sm font-semibold text-brand-purple-light bg-brand-purple/10 hover:bg-brand-purple/20 border border-brand-purple/50 rounded-lg flex items-center gap-2'
+                }, React.createElement(EditIcon, { className: 'w-4 h-4' }), "Edit Criteria"),
                  React.createElement('button', {
                     onClick: () => window.print(),
                     className: 'px-4 py-2 text-sm font-semibold text-white bg-button-gradient hover:opacity-90 rounded-lg shadow-md'
@@ -311,8 +375,8 @@ const ResultsView = ({ plan, onReset }) => {
             React.createElement('div', { className: 'break-before-page' },
                 React.createElement('h3', { className: 'text-2xl font-bold text-white print:text-black mb-6 mt-8 print:mt-0 uppercase tracking-wider' }, "4. Governance & Organization"),
                 React.createElement('div', { className: 'grid grid-cols-1 gap-6' },
-                    React.createElement(SectionCard, { title: "4.1 Roles & Responsibilities", content: plan.governanceStructure.rolesAndResponsibilities }),
-                    React.createElement(SectionCard, { title: "4.2 RACI Matrix", content: plan.governanceStructure.raciMatrix })
+                    React.createElement(SectionCard, { title: "4.1 Roles & Responsibilities", content: plan.governanceStructure?.rolesAndResponsibilities }),
+                    React.createElement(SectionCard, { title: "4.2 RACI Matrix", content: plan.governanceStructure?.raciMatrix })
                 )
             ),
 
@@ -334,6 +398,10 @@ const ComprehensivePlanView = ({ language, projectData, onUpdateProject, isLoadi
     const fullscreenRef = useRef(null);
     const contentRef = useRef(null);
     
+    // Local state to handle Edit/Regenerate workflow
+    const [isEditingCriteria, setIsEditingCriteria] = useState(false);
+    const [criteria, setCriteria] = useState(null);
+
     // Toolbar state
     const [zoomLevel, setZoomLevel] = useState(1);
     const [isEditing, setIsEditing] = useState(false);
@@ -346,6 +414,9 @@ const ComprehensivePlanView = ({ language, projectData, onUpdateProject, isLoadi
     const handleGenerate = async (formData) => {
         setIsLoading(true);
         setError(null);
+        setIsEditingCriteria(false);
+        setCriteria(formData); // Save current criteria
+        
         try {
             const plan = await generateConsultingPlan(formData);
             
@@ -364,16 +435,17 @@ const ComprehensivePlanView = ({ language, projectData, onUpdateProject, isLoadi
     };
 
     const handleReset = () => {
-        // Resetting doesn't necessarily clear the objective if they want to try again, but we clear the plan view
         onUpdateProject({ consultingPlan: null });
+        setCriteria(null);
         setError(null);
+        setIsEditingCriteria(false);
     };
 
     // Check if plan exists in props
     const hasPlan = !!projectData.consultingPlan;
 
     return React.createElement('div', { ref: fullscreenRef, className: "h-full flex flex-col text-white bg-dark-card printable-container" },
-        hasPlan && React.createElement(FeatureToolbar, {
+        hasPlan && !isEditingCriteria && React.createElement(FeatureToolbar, {
             title: t.dashboardConsultingPlan,
             containerRef: fullscreenRef,
             onZoomIn: handleZoomIn,
@@ -385,17 +457,27 @@ const ComprehensivePlanView = ({ language, projectData, onUpdateProject, isLoadi
         React.createElement('div', { className: 'flex-grow min-h-0 overflow-auto' },
             React.createElement('div', {
                ref: contentRef,
-               className: 'p-8 printable-content w-full pb-32 min-h-full', // Ensure min-h-full for scroll and pb-32 for padding
+               className: 'p-8 printable-content w-full pb-32 min-h-full',
                style: { transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.2s ease' },
                contentEditable: isEditing,
                suppressContentEditableWarning: true
             },
                 isLoading
                 ? React.createElement(LoadingView, null)
-                : hasPlan
-                    ? React.createElement(ResultsView, { plan: projectData.consultingPlan, onReset: handleReset })
+                : (hasPlan && !isEditingCriteria)
+                    ? React.createElement(ResultsView, { 
+                        plan: projectData.consultingPlan, 
+                        criteria: criteria, 
+                        onReset: handleReset, 
+                        onEdit: () => setIsEditingCriteria(true) 
+                      })
                     : React.createElement('div', { className: 'h-full flex items-center justify-center' }, 
-                        React.createElement(InputView, { onGenerate: handleGenerate, isLoading: false, error })
+                        React.createElement(InputView, { 
+                            onGenerate: handleGenerate, 
+                            initialData: criteria, 
+                            isLoading: false, 
+                            error 
+                        })
                       )
             )
         )
