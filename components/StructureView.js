@@ -228,13 +228,33 @@ const StructureView = ({ language, projectData, onUpdateProject, isLoading, setI
     const handleToggleEdit = () => setIsEditing(prev => !prev);
     const handleExport = () => window.print();
 
+    // Auto-generate if project objective exists but structure is missing
+    useEffect(() => {
+        if (projectData.objective && !projectData.structure && !isLoading) {
+             const generate = async () => {
+                try {
+                    setIsLoading(true);
+                    setError(null);
+                    const data = await generateProjectStructure(projectData.objective);
+                    onUpdateProject({ structure: data });
+                } catch (err) {
+                    setError(err.message || "Failed to generate structure.");
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            generate();
+        }
+    }, [projectData.objective, projectData.structure, isLoading, onUpdateProject, setIsLoading, setError]);
+
     const handleGenerate = async () => {
         if (!objective.trim()) return;
         setIsLoading(true);
         setError(null);
         try {
             const data = await generateProjectStructure(objective);
-            onUpdateProject({ structure: data }); // Save to parent
+            // Save both structure and the manual objective to global state
+            onUpdateProject({ structure: data, objective: objective }); 
         } catch (err) {
             setError(err.message || 'An unexpected error occurred.');
         } finally {
