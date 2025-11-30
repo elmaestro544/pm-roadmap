@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,6 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- n8n Chatbot Styles -->
+    <link href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" rel="stylesheet" />
     <style>
         html {
             scroll-behavior: smooth;
@@ -17,6 +18,49 @@
             background-color: #0D0C13;
             color: #f8fafc;
         }
+
+        /* --- n8n Chatbot Theme Overrides --- */
+        :root {
+            --chat--color-primary: #2DD4BF !important; /* Brand Turquoise */
+            --chat--color-secondary: #0D0C13 !important; /* Main Dark BG */
+            --chat--color-dark: #14121E !important;
+            --chat--color-light: #F8FAFC !important; /* Brand Text */
+            
+            --chat--font-family: 'Poppins', sans-serif !important;
+            
+            /* Header */
+            --chat--header--background: linear-gradient(135deg, #2DD4BF 0%, #A3E635 100%) !important;
+            --chat--header--color: #ffffff !important;
+            
+            /* Window / Backgrounds */
+            --chat--window--background: #14121E !important; /* Dark Card Solid */
+            --chat--background: #14121E !important;
+            --chat--window--border-radius: 16px !important;
+            --chat--window--width: 400px !important;
+            --chat--window--height: 650px !important;
+            
+            /* Inputs */
+            --chat--input--background: #F8FAFC !important;
+            --chat--input--color: #F8FAFC !important;
+            --chat--input--border: 1px solid rgba(45, 212, 191, 0.2) !important;
+            --chat--input--border-radius: 12px !important;
+            
+            /* Messages */
+            --chat--message--bot--background: #1E1B2E !important;
+            --chat--message--bot--color: #F8FAFC !important;
+            --chat--message--bot--border: 1px solid rgba(255,255,255,0.05) !important;
+            
+            --chat--message--user--background: #40E0D0 !important;
+            --chat--message--user--color: #ffffff !important;
+            
+            /* Toggle Button */
+            --chat--toggle--background: #2DD4BF !important;
+            --chat--toggle--hover--background: #5EEAD4 !important;
+            --chat--toggle--active--background: #2DD4BF !important;
+            --chat--toggle--color: #ffffff !important;
+            --chat--toggle--size: 60px !important;
+        }
+
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -317,6 +361,28 @@
 </script>
     
     <script type="module" src="index.js"></script>
+
+    <!-- n8n Chatbot Integration with Slick Dark Theme -->
+    <script type="module">
+        import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
+        
+        createChat({
+            webhookUrl: 'https://n8n.roadmap.casa/webhook/2324fc10-4f80-4631-ba6e-7775697bc69d/chat',
+            mode: 'dark',
+            showWelcomeScreen: true,
+            defaultLanguage: 'en',
+            initialMessages: [
+                '👋 Hi! I am your PM Roadmap Assistant. Ask me anything about our AI project management tools!'
+            ],
+            i18n: {
+                en: {
+                    title: 'PM Roadmap Support',
+                    subtitle: 'Ask us anything',
+                    inputPlaceholder: 'Type your message...',
+                },
+            },
+        });
+    </script>
 <script type="module" src="/index.tsx"></script>
 </body>
 </html>
