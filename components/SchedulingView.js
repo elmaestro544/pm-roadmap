@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { generateScheduleFromPlan } from '../services/schedulingService.js';
 import { ScheduleIcon, Spinner, BoardIcon, ListIcon, TimelineIcon, ZoomInIcon, ZoomOutIcon, FullscreenIcon, FullscreenExitIcon, ExpandIcon, CollapseIcon, EditIcon, ExportIcon } from './Shared.js';
@@ -432,7 +433,7 @@ const EditableListView = ({ tasks, onUpdate, currency }) => (
                                 type: 'date',
                                 value: task.start,
                                 onChange: (e) => onUpdate(task.id, 'start', e.target.value),
-                                className: "bg-transparent w-full outline-none text-brand-text-light print:text-black"
+                                className: "bg-transparent w-full outline-none text-slate-200 print:text-black"
                             })
                         ),
                         React.createElement('td', { className: 'p-4' },
@@ -440,7 +441,7 @@ const EditableListView = ({ tasks, onUpdate, currency }) => (
                                 type: 'date',
                                 value: task.end,
                                 onChange: (e) => onUpdate(task.id, 'end', e.target.value),
-                                className: "bg-transparent w-full outline-none text-brand-text-light print:text-black"
+                                className: "bg-transparent w-full outline-none text-slate-200 print:text-black"
                             })
                         ),
                         React.createElement('td', { className: 'p-4' },
@@ -448,7 +449,7 @@ const EditableListView = ({ tasks, onUpdate, currency }) => (
                                 value: task.resource || '',
                                 onChange: (e) => onUpdate(task.id, 'resource', e.target.value),
                                 placeholder: "Unassigned",
-                                className: "bg-transparent w-full outline-none text-brand-text-light print:text-black"
+                                className: "bg-transparent w-full outline-none text-slate-200 print:text-black"
                             })
                         ),
                         React.createElement('td', { className: 'p-4' },
@@ -456,7 +457,7 @@ const EditableListView = ({ tasks, onUpdate, currency }) => (
                                 type: "number",
                                 value: task.cost || 0,
                                 onChange: (e) => onUpdate(task.id, 'cost', parseFloat(e.target.value)),
-                                className: "bg-transparent w-24 outline-none text-brand-text-light print:text-black"
+                                className: "bg-transparent w-24 outline-none text-slate-200 print:text-black"
                             })
                         ),
                         React.createElement('td', { className: 'p-4' },
@@ -467,7 +468,7 @@ const EditableListView = ({ tasks, onUpdate, currency }) => (
                                     onChange: (e) => onUpdate(task.id, 'progress', parseInt(e.target.value)),
                                     className: "w-16 h-1.5 bg-dark-bg rounded-lg appearance-none cursor-pointer accent-brand-purple"
                                 }),
-                                React.createElement('span', { className: 'w-8 text-right' }, `${task.progress}%`)
+                                React.createElement('span', { className: 'w-8 text-right text-slate-200' }, `${task.progress}%`)
                              )
                         ),
                         React.createElement('td', { className: 'p-4' },
@@ -475,7 +476,7 @@ const EditableListView = ({ tasks, onUpdate, currency }) => (
                                 value: task.dependencies?.join(', ') || '',
                                 onChange: (e) => onUpdate(task.id, 'dependencies', e.target.value.split(',').map(s=>s.trim())),
                                 placeholder: "-",
-                                className: "bg-transparent w-full outline-none text-brand-text-light print:text-black"
+                                className: "bg-transparent w-full outline-none text-slate-200 print:text-black"
                             })
                         )
                     )
@@ -625,7 +626,7 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                     React.createElement(IconButton, { icon: React.createElement(ZoomOutIcon), onClick: () => setZoom(z => Math.max(z - 0.2, 0.5)), tooltip: "Zoom Out" }),
                     React.createElement(IconButton, { icon: React.createElement(ZoomInIcon), onClick: () => setZoom(z => Math.min(z + 0.2, 2)), tooltip: "Zoom In" }),
                     
-                    // Compact Scale Selector
+                    // Compact Scale Selector (Abbreviated)
                     React.createElement('div', { className: 'flex bg-dark-card-solid rounded-lg p-1 border border-dark-border mx-2' },
                         [
                             { id: 'days', label: 'D' },
