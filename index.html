@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -19,7 +20,7 @@
             color: #f8fafc;
         }
 
-        /* --- n8n Chatbot Theme Overrides --- */
+        /* --- Force n8n Chatbot Theme Overrides --- */
         :root {
             --chat--color-primary: #2DD4BF !important; /* Brand Turquoise */
             --chat--color-secondary: #0D0C13 !important; /* Main Dark BG */
@@ -37,10 +38,10 @@
             --chat--background: #14121E !important;
             --chat--window--border-radius: 16px !important;
             --chat--window--width: 400px !important;
-            --chat--window--height: 650px !important;
+            --chat--window--height: 600px !important;
             
             /* Inputs */
-            --chat--input--background: #F8FAFC !important;
+            --chat--input--background: #0D0C13 !important;
             --chat--input--color: #F8FAFC !important;
             --chat--input--border: 1px solid rgba(45, 212, 191, 0.2) !important;
             --chat--input--border-radius: 12px !important;
@@ -50,7 +51,7 @@
             --chat--message--bot--color: #F8FAFC !important;
             --chat--message--bot--border: 1px solid rgba(255,255,255,0.05) !important;
             
-            --chat--message--user--background: #40E0D0 !important;
+            --chat--message--user--background: linear-gradient(135deg, #2DD4BF 0%, #2ba898 100%) !important;
             --chat--message--user--color: #ffffff !important;
             
             /* Toggle Button */
@@ -373,14 +374,7 @@
             defaultLanguage: 'en',
             initialMessages: [
                 '👋 Hi! I am your PM Roadmap Assistant. Ask me anything about our AI project management tools!'
-            ],
-            i18n: {
-                en: {
-                    title: 'PM Roadmap Support',
-                    subtitle: 'Ask us anything',
-                    inputPlaceholder: 'Type your message...',
-                },
-            },
+            ]
         });
     </script>
 <script type="module" src="/index.tsx"></script>

@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { generateScheduleFromPlan } from '../services/schedulingService.js';
-import { ScheduleIcon, Spinner, FeatureToolbar, BoardIcon, ListIcon, TimelineIcon } from './Shared.js';
+import { ScheduleIcon, Spinner, BoardIcon, ListIcon, TimelineIcon, ZoomInIcon, ZoomOutIcon, FullscreenIcon, FullscreenExitIcon, ExpandIcon, CollapseIcon, EditIcon, ExportIcon } from './Shared.js';
 import { i18n } from '../constants.js';
 
 // --- Helper Functions ---
@@ -24,6 +23,17 @@ const formatDate = (dateStr) => {
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
+const ACTIVITY_COLORS = [
+    '#2DD4BF', // Turquoise (Brand)
+    '#F472B6', // Pink
+    '#818CF8', // Indigo
+    '#FB923C', // Orange
+    '#34D399', // Emerald
+    '#60A5FA', // Blue
+    '#FBBF24', // Amber
+    '#A78BFA'  // Purple
+];
+
 // --- Sub-Components ---
 
 const LoadingView = () => (
@@ -45,8 +55,8 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
         const minDate = new Date(Math.min(...startDates));
         const maxDate = new Date(Math.max(...endDates));
         // Buffer
-        minDate.setDate(minDate.getDate() - 2);
-        maxDate.setDate(maxDate.getDate() + 5);
+        minDate.setDate(minDate.getDate() - 5);
+        maxDate.setDate(maxDate.getDate() + 10);
         return { start: minDate, end: maxDate, totalDays: getDaysDiff(minDate, maxDate) };
     }, [tasks]);
 
@@ -95,19 +105,58 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
         return result;
     }, [dates, scale]);
 
+    // Top Header Grouping (Month/Year)
+    const headerGroups = useMemo(() => {
+        const groups = [];
+        if (!periods.length) return [];
+
+        let currentGroup = null;
+
+        periods.forEach((p) => {
+            let label = '';
+            if (scale === 'days' || scale === 'weeks') {
+                label = p.toLocaleString('default', { month: 'long', year: 'numeric' });
+            } else {
+                label = p.getFullYear().toString();
+            }
+
+            if (!currentGroup || currentGroup.label !== label) {
+                if (currentGroup) groups.push(currentGroup);
+                currentGroup = { label, width: colWidth, count: 1 };
+            } else {
+                currentGroup.width += colWidth;
+                currentGroup.count += 1;
+            }
+        });
+        if (currentGroup) groups.push(currentGroup);
+        return groups;
+    }, [periods, scale, colWidth]);
+
+
     const visibleTasks = useMemo(() => {
         const result = [];
+        let colorIndex = 0;
+        
         tasks.forEach(task => {
+            const taskWithColor = { ...task };
+            
             if (task.type === 'project') {
-                result.push({ ...task, level: 0 });
+                taskWithColor.level = 0;
+                taskWithColor.color = '#1E1B2E'; // Dark background for project container look
             } else if (task.type === 'task') {
                 const parentExpanded = !task.project || expanded.has(task.project); 
                 if (parentExpanded) {
-                    result.push({ ...task, level: 1 });
+                    taskWithColor.level = 1;
+                    taskWithColor.color = ACTIVITY_COLORS[colorIndex % ACTIVITY_COLORS.length];
+                    colorIndex++;
+                } else {
+                    return; // Skip hidden task
                 }
             } else {
-                result.push({ ...task, level: 0 });
+                taskWithColor.level = 0;
+                taskWithColor.color = '#FFFFFF';
             }
+            result.push(taskWithColor);
         });
         return result;
     }, [tasks, expanded]);
@@ -131,10 +180,11 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
         return 0;
     };
 
-    const rowHeight = 40;
+    const rowHeight = 44; // Increased slightly for clarity
+    const headerHeight = 72; // 2 rows (36px each)
     const taskListWidth = 300; 
 
-    // Dependency Lines Calculation
+    // Dependency Lines Calculation (Orthogonal)
     const dependencyLines = useMemo(() => {
         const lines = [];
         const taskYMap = new Map();
@@ -142,8 +192,9 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
 
         visibleTasks.forEach(task => {
             if (task.dependencies && task.dependencies.length > 0) {
-                const endX = getLeftPos(task.start) + getWidth(task.start, task.end);
-                
+                const endX = getLeftPos(task.start) + 2; // Target input
+                const endY = taskYMap.get(task.id);
+
                 // For each predecessor
                 task.dependencies.forEach(depId => {
                     const predTask = tasks.find(t => t.id === depId);
@@ -151,14 +202,27 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                         const startY = taskYMap.get(depId);
                         const startX = getLeftPos(predTask.start) + getWidth(predTask.start, predTask.end);
                         
-                        const endY = taskYMap.get(task.id);
-                        const targetX = getLeftPos(task.start);
+                        // Orthogonal Path Logic
+                        // Start -> Right 10px -> Vertical -> Right to End
+                        const x1 = startX;
+                        const y1 = startY;
+                        const x2 = endX;
+                        const y2 = endY;
+                        
+                        const midX = x1 + 10;
+                        
+                        // Clean Right-Angle Path
+                        let d = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
+                        
+                        // Fallback for overlapping/backward cases to keep neat
+                        if (midX > x2) {
+                             const fallbackMidY = y1 + (y2 > y1 ? 10 : -10);
+                             d = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${fallbackMidY} L ${x2 - 10} ${fallbackMidY} L ${x2 - 10} ${y2} L ${x2} ${y2}`;
+                        }
 
-                        // Draw path
                         lines.push({ 
                             id: `${depId}-${task.id}`,
-                            d: `M ${startX} ${startY} 
-                                C ${startX + 20} ${startY}, ${targetX - 20} ${endY}, ${targetX} ${endY}` 
+                            d: d
                         });
                     }
                 });
@@ -170,25 +234,42 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
     return React.createElement('div', { className: 'h-full w-full overflow-auto bg-dark-bg relative border border-dark-border rounded-xl scrollbar-thin' },
         React.createElement('div', { className: 'min-w-fit flex flex-col relative' },
             
-            // --- Header Row (Sticky Top) ---
-            React.createElement('div', { className: 'flex sticky top-0 z-30 bg-dark-card-solid border-b border-dark-border h-12' },
-                // Top Left Corner
-                React.createElement('div', { 
-                    className: 'sticky left-0 z-40 w-[300px] flex-shrink-0 bg-dark-card-solid border-r border-dark-border flex items-center px-4 font-bold text-brand-text shadow-md',
-                    style: { minWidth: taskListWidth, width: taskListWidth }
-                }, "Task Name"),
+            // --- Sticky Header Section ---
+            React.createElement('div', { className: 'sticky top-0 z-30 bg-dark-card-solid border-b border-dark-border shadow-md' },
+                // Row 1: Month/Year Grouping
+                React.createElement('div', { className: 'flex h-9 border-b border-dark-border/50' },
+                     React.createElement('div', { 
+                        className: 'sticky left-0 z-40 bg-dark-card-solid border-r border-dark-border flex-shrink-0',
+                        style: { width: taskListWidth }
+                    }), // Empty corner for top row
+                    headerGroups.map((group, i) => 
+                        React.createElement('div', {
+                            key: i,
+                            className: 'flex-shrink-0 flex items-center justify-start px-2 text-xs font-bold text-brand-text border-r border-dark-border/30 bg-dark-card-solid/50',
+                            style: { width: group.width }
+                        }, group.label)
+                    )
+                ),
                 
-                // Timeline Dates Header
-                React.createElement('div', { className: 'flex' },
+                // Row 2: Days/Weeks scale
+                React.createElement('div', { className: 'flex h-9' },
+                    // Sticky Task List Header
+                    React.createElement('div', { 
+                        className: 'sticky left-0 z-40 bg-dark-card-solid border-r border-dark-border flex items-center px-4 font-bold text-white text-sm',
+                        style: { width: taskListWidth }
+                    }, "Task Name"),
+                    
+                    // Period Headers
                     periods.map((p, i) => 
                         React.createElement('div', { 
                             key: i, 
-                            className: 'flex-shrink-0 border-r border-dark-border px-2 py-3 text-xs text-brand-text-light font-medium truncate flex items-center justify-center',
+                            className: 'flex-shrink-0 border-r border-dark-border/30 px-1 py-2 text-[10px] text-brand-text-light font-medium flex items-center justify-center bg-dark-card/30',
                             style: { width: colWidth }
                         }, 
                             scale === 'days' ? p.getDate() : 
-                            scale === 'quarters' ? `Q${Math.floor(p.getMonth() / 3) + 1} ${p.getFullYear()}` :
-                            p.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                            scale === 'quarters' ? `Q${Math.floor(p.getMonth() / 3) + 1}` :
+                            scale === 'months' ? p.toLocaleString('default', { month: 'short' }) :
+                            `W${Math.ceil(p.getDate()/7)}`
                         )
                     )
                 )
@@ -196,32 +277,31 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
 
             // --- Body Grid ---
             // Background Grid Lines
-            React.createElement('div', { className: 'absolute top-12 bottom-0 left-[300px] flex pointer-events-none z-0' },
+            React.createElement('div', { className: 'absolute top-[72px] bottom-0 left-[300px] flex pointer-events-none z-0' },
                 periods.map((p, i) => 
                     React.createElement('div', { 
                         key: i, 
-                        className: 'flex-shrink-0 border-r border-dark-border/30 h-full',
+                        className: `flex-shrink-0 border-r border-dark-border/10 h-full ${p.getDay() === 0 || p.getDay() === 6 ? 'bg-white/5' : ''}`, // Highlight weekends
                         style: { width: colWidth }
                     })
                 )
             ),
 
             // Relations Overlay (SVG)
-            React.createElement('svg', { className: 'absolute top-12 left-[300px] pointer-events-none z-10 w-full h-full' },
+            React.createElement('svg', { className: 'absolute top-[72px] left-[300px] pointer-events-none z-10 w-full h-full' },
                 dependencyLines.map(line => 
                     React.createElement('path', {
                         key: line.id,
                         d: line.d,
                         fill: "none",
-                        stroke: "#5EEAD4", // brand-purple-light
+                        stroke: "#94A3B8", // slate-400, neutral color for lines
                         strokeWidth: "1.5",
-                        opacity: "0.5",
                         markerEnd: "url(#arrowhead)"
                     })
                 ),
                 React.createElement('defs', null,
-                    React.createElement('marker', { id: "arrowhead", markerWidth: "6", markerHeight: "7", refX: "5", refY: "3.5", orient: "auto" },
-                        React.createElement('polygon', { points: "0 0, 6 3.5, 0 7", fill: "#5EEAD4" })
+                    React.createElement('marker', { id: "arrowhead", markerWidth: "6", markerHeight: "6", refX: "5", refY: "3", orient: "auto" },
+                        React.createElement('path', { d: "M0,0 L0,6 L6,3 z", fill: "#94A3B8" })
                     )
                 )
             ),
@@ -232,47 +312,47 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                 const left = getLeftPos(task.start);
                 const width = getWidth(task.start, task.end);
                 
-                return React.createElement('div', { key: task.id, className: 'flex h-10 hover:bg-white/5 transition-colors relative group' },
+                return React.createElement('div', { key: task.id, className: 'flex hover:bg-white/5 transition-colors relative group', style: { height: rowHeight } },
                     
                     // Task List Column (Sticky Left)
                     React.createElement('div', { 
-                        className: `sticky left-0 z-20 w-[300px] flex-shrink-0 border-r border-dark-border flex items-center px-4 gap-2 overflow-hidden shadow-md ${isProject ? 'bg-dark-card-solid' : 'bg-dark-card'}`,
-                        style: { minWidth: taskListWidth, width: taskListWidth }
+                        className: `sticky left-0 z-20 flex-shrink-0 border-r border-dark-border flex items-center px-4 gap-2 overflow-hidden shadow-[4px_0_10px_rgba(0,0,0,0.3)] ${isProject ? 'bg-dark-card-solid' : 'bg-dark-card'}`,
+                        style: { width: taskListWidth }
                     },
-                        React.createElement('div', { style: { width: task.level * 20 } }), // Indentation
+                        React.createElement('div', { style: { width: task.level * 16 } }), // Indentation
                         isProject && React.createElement('button', { 
                             onClick: () => onToggle(task.id),
                             className: 'p-0.5 hover:text-white text-brand-purple-light focus:outline-none'
                         }, expanded.has(task.id) ? '▼' : '▶'),
-                        React.createElement('span', { className: `truncate text-sm font-medium ${isProject ? 'text-white' : 'text-brand-text-light'}` }, task.name)
+                        React.createElement('span', { className: `truncate text-sm ${isProject ? 'font-bold text-white uppercase tracking-wide' : 'font-medium text-brand-text-light'}` }, task.name)
                     ),
 
                     // Timeline Bar Area
-                    React.createElement('div', { className: 'relative flex-grow z-20' }, // z-20 to be above lines
+                    React.createElement('div', { className: 'relative flex-grow z-20 py-2' }, 
                         React.createElement('div', {
-                            className: `absolute top-2 h-6 rounded-md shadow-sm text-[10px] text-white whitespace-nowrap overflow-visible flex items-center`,
+                            className: `absolute top-1/2 -translate-y-1/2 h-6 rounded shadow-md text-[10px] text-white whitespace-nowrap overflow-visible flex items-center cursor-pointer transition-all hover:brightness-110`,
                             style: { 
                                 left: left, 
                                 width: width,
-                                backgroundColor: isProject ? '#2DD4BF' : 'rgba(45, 212, 191, 0.15)', 
+                                backgroundColor: task.color, 
+                                opacity: isProject ? 1 : 0.9
                             }
                         },
-                            // Progress Fill
-                            !isProject && React.createElement('div', {
-                                className: 'h-full bg-gradient-to-r from-brand-purple to-brand-purple-light absolute left-0 top-0 rounded-l-md transition-all duration-500',
-                                style: { width: `${task.progress}%` }
-                            }),
-                            
                             // Resource Label (Right of bar)
                             !isProject && React.createElement('span', { 
                                 className: 'absolute left-full ml-2 text-xs text-brand-text-light font-medium truncate pointer-events-none' 
                             }, task.resource),
 
                             // % Label (Inside)
-                            React.createElement('span', { className: `relative z-10 px-2 ${isProject ? 'font-bold' : ''}` },
-                                width > 40 ? `${task.progress}%` : ''
+                            React.createElement('span', { className: `relative z-10 px-2 drop-shadow-md font-semibold` },
+                                width > 30 ? `${task.progress}%` : ''
                             )
-                        )
+                        ),
+                        // Milestone Diamond (if type milestone - not implemented in schema yet but structure ready)
+                        task.type === 'milestone' && React.createElement('div', {
+                            className: 'absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-brand-cyan rotate-45 border-2 border-dark-bg',
+                            style: { left: left - 12 }
+                        })
                     )
                 )
             })
@@ -414,6 +494,7 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
     const [zoom, setZoom] = useState(1);
     const [isEditing, setIsEditing] = useState(false);
     const [expanded, setExpanded] = useState(new Set());
+    const [isFullscreen, setIsFullscreen] = useState(false);
 
     useEffect(() => {
         if (projectData.plan && !projectData.schedule && !isLoading) {
@@ -466,6 +547,23 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
         const allIds = projectData.schedule.filter(t => t.type === 'project').map(t => t.id);
         setExpanded(new Set(allIds));
     };
+    
+    const handleFullscreen = () => {
+        if (!fullscreenRef.current) return;
+        if (!document.fullscreenElement) {
+            fullscreenRef.current.requestFullscreen().catch(err => {
+                alert(`Error attempting to enable full-screen mode: ${err.message}`);
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    };
+
+    useEffect(() => {
+        const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+        document.addEventListener('fullscreenchange', onFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+    }, []);
 
     const renderContent = () => {
         if (isLoading) return React.createElement(LoadingView, null);
@@ -492,38 +590,78 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                 });
         }
     };
+    
+    const IconButton = ({ icon, onClick, tooltip, active }) => (
+        React.createElement('button', {
+            onClick, title: tooltip,
+            className: `p-2 rounded-md transition-colors ${active ? 'bg-brand-purple text-white' : 'text-brand-text-light hover:bg-white/10 hover:text-white'}`
+        }, icon)
+    );
 
     return React.createElement('div', { ref: fullscreenRef, className: "h-full flex flex-col text-white bg-dark-card printable-container" },
-        React.createElement('div', { className: 'non-printable flex-shrink-0 border-b border-dark-border bg-dark-card/50 px-6 h-12 flex items-center justify-between' },
-             React.createElement('div', { className: 'flex items-center gap-1' },
-                [
-                    { id: 'timeline', label: 'Timeline', icon: TimelineIcon },
-                    { id: 'board', label: 'Board', icon: BoardIcon },
-                    { id: 'list', label: 'List', icon: ListIcon }
-                ].map(mode => 
-                    React.createElement('button', {
-                        key: mode.id,
-                        onClick: () => setViewMode(mode.id),
-                        className: `flex items-center gap-2 px-4 py-1.5 rounded-t-lg text-sm font-semibold transition-colors border-b-2 ${viewMode === mode.id ? 'border-brand-purple text-white bg-white/5' : 'border-transparent text-brand-text-light hover:text-white'}`
-                    }, React.createElement(mode.icon, { className: 'w-4 h-4' }), mode.label)
+        // --- Unified Compact Header ---
+        React.createElement('div', { className: 'non-printable flex-shrink-0 border-b border-dark-border bg-dark-card/50 px-4 h-14 flex items-center justify-between' },
+             // View Switcher (Left)
+             React.createElement('div', { className: 'flex items-center gap-2' },
+                React.createElement('h2', { className: 'text-lg font-bold text-white mr-4' }, t.dashboardScheduling),
+                React.createElement('div', { className: 'flex bg-dark-card-solid rounded-lg p-1 border border-dark-border' },
+                    [
+                        { id: 'timeline', label: 'Timeline', icon: TimelineIcon },
+                        { id: 'board', label: 'Board', icon: BoardIcon },
+                        { id: 'list', label: 'List', icon: ListIcon }
+                    ].map(mode => 
+                        React.createElement('button', {
+                            key: mode.id,
+                            onClick: () => setViewMode(mode.id),
+                            className: `flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${viewMode === mode.id ? 'bg-brand-purple text-white shadow-sm' : 'text-brand-text-light hover:text-white hover:bg-white/5'}`
+                        }, React.createElement(mode.icon, { className: 'w-3 h-3' }), mode.label)
+                    )
                 )
+             ),
+             
+             // Tools (Right)
+             React.createElement('div', { className: 'flex items-center gap-2' },
+                viewMode === 'timeline' && React.createElement(React.Fragment, null,
+                    React.createElement(IconButton, { icon: React.createElement(ZoomOutIcon), onClick: () => setZoom(z => Math.max(z - 0.2, 0.5)), tooltip: "Zoom Out" }),
+                    React.createElement(IconButton, { icon: React.createElement(ZoomInIcon), onClick: () => setZoom(z => Math.min(z + 0.2, 2)), tooltip: "Zoom In" }),
+                    
+                    // Compact Scale Selector
+                    React.createElement('div', { className: 'flex bg-dark-card-solid rounded-lg p-1 border border-dark-border mx-2' },
+                        [
+                            { id: 'days', label: 'D' },
+                            { id: 'weeks', label: 'W' },
+                            { id: 'months', label: 'M' },
+                            { id: 'quarters', label: 'Q' }
+                        ].map(option => React.createElement('button', {
+                            key: option.id,
+                            onClick: () => setScale(option.id),
+                            className: `w-8 h-7 flex items-center justify-center text-xs font-bold rounded-md transition-colors ${scale === option.id ? 'bg-dark-bg text-white border border-dark-border' : 'text-brand-text-light hover:bg-white/5'}`
+                        }, option.label))
+                    ),
+
+                    React.createElement(IconButton, { icon: React.createElement(ExpandIcon), onClick: handleExpandAll, tooltip: "Expand All" }),
+                    React.createElement(IconButton, { icon: React.createElement(CollapseIcon), onClick: handleCollapseAll, tooltip: "Collapse All" }),
+                    React.createElement('div', { className: 'w-px h-6 bg-dark-border mx-1' }),
+                ),
+                
+                React.createElement(IconButton, { 
+                    icon: React.createElement(EditIcon), 
+                    onClick: () => setIsEditing(!isEditing), 
+                    active: isEditing,
+                    tooltip: isEditing ? "Finish Editing" : "Edit Mode" 
+                }),
+                React.createElement(IconButton, { 
+                    icon: isFullscreen ? React.createElement(FullscreenExitIcon) : React.createElement(FullscreenIcon), 
+                    onClick: handleFullscreen, 
+                    tooltip: "Fullscreen" 
+                }),
+                React.createElement(IconButton, { icon: React.createElement(ExportIcon), onClick: () => window.print(), tooltip: "Export" })
              )
         ),
-        React.createElement(FeatureToolbar, {
-            title: t.dashboardScheduling,
-            containerRef: fullscreenRef,
-            onZoomIn: () => setZoom(z => Math.min(z + 0.2, 2)),
-            onZoomOut: () => setZoom(z => Math.max(z - 0.2, 0.5)),
-            onToggleEdit: () => setIsEditing(!isEditing),
-            isEditing: isEditing,
-            onExport: () => window.print(),
-            scale: scale,
-            onScaleChange: setScale,
-            onExpandAll: handleExpandAll,
-            onCollapseAll: handleCollapseAll
-        }),
+        
+        // --- Content Area ---
         React.createElement('div', { className: 'flex-grow min-h-0 overflow-hidden' },
-            React.createElement('div', { className: 'p-6 h-full printable-content' },
+            React.createElement('div', { className: 'p-0 h-full printable-content' },
                 renderContent()
             )
         )
