@@ -1,7 +1,5 @@
 
-
-
-import { PlanningIcon, RiskIcon, ScheduleIcon, BudgetIcon, AssistantIcon, StructureIcon, KpiIcon, SCurveIcon, DocumentIcon } from './components/Shared.js';
+import { PlanningIcon, RiskIcon, ScheduleIcon, BudgetIcon, AssistantIcon, StructureIcon, KpiIcon, SCurveIcon, DocumentIcon, DashboardIcon } from './components/Shared.js';
 
 export const AppView = Object.freeze({
   Home: 'home',
@@ -25,6 +23,7 @@ export const Language = Object.freeze({
 // Reordered to match logical project workflow: 
 // Plan -> Planning -> Scheduling -> Budget -> Risk -> Structure -> KPIs -> S-Curve -> Assistant
 export const DASHBOARD_VIEWS = [
+    { id: 'overview', titleKey: 'dashboardOverview', icon: DashboardIcon },
     { id: 'consultingPlan', titleKey: 'dashboardConsultingPlan', icon: DocumentIcon },
     { id: 'planning', titleKey: 'dashboardPlanning', icon: PlanningIcon },
     { id: 'scheduling', titleKey: 'dashboardScheduling', icon: ScheduleIcon },
@@ -154,6 +153,7 @@ export const i18n = {
     thinking: "AI Assistant is thinking...",
     sources: "Sources",
     dashboardAssistant: "AI Assistant",
+    dashboardOverview: "Project Overview",
     dashboardConsultingPlan: "Project Plan",
     dashboardPlanning: "Planning",
     dashboardScheduling: "Scheduling",
@@ -318,6 +318,7 @@ export const i18n = {
     thinking: "المساعد الذكي يفكر...",
     sources: "المصادر",
     dashboardAssistant: "مساعد الذكاء الاصطناعي",
+    dashboardOverview: "نظرة عامة على المشروع",
     dashboardConsultingPlan: "خطة المشروع",
     dashboardPlanning: "التخطيط",
     dashboardScheduling: "الجدولة",
@@ -373,12 +374,12 @@ export const PRICING_PLANS = [
     name: { en: 'Pro', ar: 'الاحترافية' },
     isPopular: true,
     monthly: {
-      price: { en: '$0', ar: '٠$' },
-      period: { en: '/user/month (Limited Time Offer)', ar: '/مستخدم/شهر (عرض لفترة محدودة)' },
+      price: { en: '$25', ar: '٢٥$' },
+      period: { en: '/user/month', ar: '/مستخدم/شهر' },
     },
     yearly: null,
     features: [
-      { en: 'All services are free for a limited time!', ar: 'جميع الخدمات مجانية لفترة محدودة!' },
+      { en: 'Full access to AI tools', ar: 'وصول كامل لأدوات الذكاء الاصطناعي' },
       { en: 'Unlimited projects', ar: 'مشاريع غير محدودة' },
       { en: 'Advanced AI Planning & Scheduling', ar: 'تخطيط وجدولة متقدمة بالذكاء الاصطناعي' },
       { en: 'Intelligent Risk Control & Mitigation', ar: 'تحكم ذكي في المخاطر وتخفيفها' },

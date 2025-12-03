@@ -12,19 +12,21 @@ import StructureView from './StructureView.js';
 import KpiView from './KpiView.js';
 import SCurveView from './SCurveView.js';
 import ComprehensivePlanView from './ComprehensivePlanView.js';
+import ProjectOverview from './ProjectOverview.js'; // New Import
 import { UserIcon, SidebarToggleIcon, Logo, Spinner, HistoryIcon, PlusIcon, ChevronRightIcon } from './Shared.js';
 import { getUserProjects, getProjectDetails, saveProject } from '../services/supabaseClient.js';
 
 // Updated workflow order to match DASHBOARD_VIEWS in constants.js
-const WORKFLOW_ORDER = ['consultingPlan', 'planning', 'scheduling', 'budget', 'risk', 'structure', 'kpis', 'scurve', 'assistant'];
+const WORKFLOW_ORDER = ['overview', 'consultingPlan', 'planning', 'scheduling', 'budget', 'risk', 'structure', 'kpis', 'scurve', 'assistant'];
 
 const PREREQUISITES = {
-    planning: 'objective', // Planning needs an objective (which comes from Consulting Plan or manual entry)
+    overview: 'objective', // Needs at least the basic project info
+    planning: 'objective', 
     scheduling: 'plan',
     budget: 'objective',
     risk: 'objective',
     structure: 'objective',
-    kpis: 'budget', // also needs schedule, but budget is a good gate
+    kpis: 'budget', 
     scurve: 'schedule',
 };
 
@@ -175,7 +177,7 @@ const Sidebar = ({ language, activeView, setActiveView, isExpanded, setExpanded,
 
 
 const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick, initialProjectId, onBackToProjects }) => {
-  const [activeView, setActiveView] = useState('consultingPlan');
+  const [activeView, setActiveView] = useState('overview'); // Changed default to overview
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [projectData, setProjectData] = useState({});
   const [currentProjectId, setCurrentProjectId] = useState(initialProjectId);
@@ -207,20 +209,14 @@ const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick, ini
                         kpiReport: data.kpis,
                         sCurveReport: data.s_curve,
                         consultingPlan: data.consulting_plan,
-                        agents: data.agents, // Kept for data integrity, though view is removed
-                        // Ensure criteria is loaded if it exists in the DB plan or derived
-                        criteria: data.consulting_plan ? {
-                            ...data.consulting_plan?.meta_criteria 
-                        } : null
+                        agents: data.agents, 
+                        criteria: data.consulting_plan?.meta_criteria || data.consulting_plan?.criteria || null
                     });
                     
-                    if (data.consulting_plan?.criteria) {
-                        setProjectData(prev => ({ ...prev, criteria: data.consulting_plan.criteria }));
-                    }
-
                     setCurrentProjectId(data.id);
                     setProjectTitle(data.title);
-                    setActiveView('consultingPlan');
+                    // Default to Overview for loaded projects
+                    setActiveView('overview');
                 }
             } catch (e) {
                 setError("Failed to load project");
@@ -228,10 +224,11 @@ const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick, ini
                 setIsLoading(false);
             }
         } else {
-            // Reset if no ID (New Project mode)
+            // New Project Mode
             setProjectData({});
             setCurrentProjectId(null);
             setProjectTitle("");
+            // Default to Consulting Plan for new projects to start flow
             setActiveView('consultingPlan');
         }
     };
@@ -244,10 +241,9 @@ const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick, ini
     
     // Auto-save to Supabase
     try {
-        // Only save if there's substantial data
         if (updatedData.objective || updatedData.consultingPlan?.projectTitle) {
             if (newData.criteria && updatedData.consultingPlan) {
-                updatedData.consultingPlan.criteria = newData.criteria;
+                updatedData.consultingPlan.meta_criteria = newData.criteria;
             }
             
             const savedProject = await saveProject(currentProjectId, updatedData);
@@ -304,6 +300,8 @@ const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick, ini
     }
 
     switch (activeView) {
+        case 'overview':
+            return React.createElement(ProjectOverview, commonProps);
         case 'assistant':
             return React.createElement(AssistantView, { language, currentUser });
         case 'consultingPlan':
