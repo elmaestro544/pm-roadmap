@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { AppView, Language, i18n } from './constants.js';
 import Home from './components/Home.js';
@@ -10,7 +11,7 @@ import Privacy from './components/Privacy.js';
 import Workflow from './components/Workflow.js'; 
 import AdminDashboard from './components/AdminDashboard.js';
 import UserSettings from './components/UserSettings.js'; 
-import ProjectManager from './components/ProjectManager.js'; 
+import ProjectManager from './components/ProjectManager.js'; // New Component
 import { UserIcon, Logo, MenuIcon, CloseIcon, FacebookIcon, LinkedinIcon, TelegramIcon, SettingsIcon, Spinner, LockIcon, FolderIcon } from './components/Shared.js';
 import { isAnyModelConfigured } from './services/geminiService.js';
 import AuthModal from './components/AuthModal.js';
@@ -48,23 +49,17 @@ const WelcomeModal = ({ isOpen, onClose, onAuthClick, language }) => {
     );
 };
 
-// System Warning Banner (Updated)
-const SystemWarning = ({ message, actionLabel, onAction, onDismiss }) => (
-    React.createElement('div', { className: "bg-amber-500/10 border-b border-amber-500/20 text-amber-100 px-4 py-2 text-sm flex items-center justify-between" },
+// System Warning Banner (New)
+const SystemWarning = ({ message, actionLabel, onAction }) => (
+    React.createElement('div', { className: "bg-red-500/10 border-b border-red-500/20 text-red-200 px-4 py-2 text-sm flex items-center justify-between" },
         React.createElement('div', { className: "flex items-center gap-2" },
-            React.createElement('span', { className: "text-lg" }, "⚠️"),
+            React.createElement('span', { className: "text-xl" }, "⚠️"),
             React.createElement('span', null, message)
         ),
-        React.createElement('div', { className: "flex items-center gap-4" },
-            onAction && React.createElement('button', { 
-                onClick: onAction,
-                className: "text-white underline hover:text-amber-200 text-xs font-semibold"
-            }, actionLabel),
-            React.createElement('button', {
-                onClick: onDismiss,
-                className: "text-amber-200/50 hover:text-white p-1 rounded-full hover:bg-white/10"
-            }, React.createElement(CloseIcon, { className: "w-4 h-4" }))
-        )
+        onAction && React.createElement('button', { 
+            onClick: onAction,
+            className: "text-white underline hover:text-red-100 text-xs font-semibold"
+        }, actionLabel)
     )
 );
 
@@ -284,9 +279,6 @@ const App = () => {
   const [theme, setTheme] = useState('dark');
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   
-  // Track dismissed warnings for this session
-  const [dismissedWarnings, setDismissedWarnings] = useState({ api: false, supabase: false });
-  
   // Admin Logic
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   
@@ -329,18 +321,9 @@ const App = () => {
   
   // Auth & Init
   useEffect(() => {
-    // Safety check for critical config timeout (prevent black screen hang)
-    const safetyTimeout = setTimeout(() => {
-        if (isAuthChecking) {
-            console.warn("Auth check timed out, forcing render.");
-            setIsAuthChecking(false);
-        }
-    }, 3000);
-
     if (!supabase) {
         setIsAuthChecking(false);
-        clearTimeout(safetyTimeout);
-        // We allow running without Supabase (Offline mode)
+        // We allow running without Supabase, just some features might break.
         return;
     }
 
@@ -397,7 +380,6 @@ const App = () => {
 
     return () => {
         mounted = false;
-        clearTimeout(safetyTimeout);
         unsubscribePromise.then(unsub => unsub && unsub());
     };
   }, []); 
@@ -496,23 +478,21 @@ const App = () => {
     }
   };
 
-  const apiKeyMissing = !isAnyModelConfigured() && !dismissedWarnings.api;
-  const supabaseMissing = !supabase && !dismissedWarnings.supabase;
+  const apiKeyMissing = !isAnyModelConfigured();
+  const supabaseMissing = !supabase;
 
   return React.createElement('div', { className: "min-h-screen flex flex-col font-sans" },
     // System Warnings
     (apiKeyMissing || supabaseMissing) && React.createElement('div', { className: "sticky top-0 z-[60]" },
         apiKeyMissing && React.createElement(SystemWarning, { 
-            message: "API Key missing. AI features disabled.", 
-            actionLabel: "Configure",
-            onAction: handleAdminAccess,
-            onDismiss: () => setDismissedWarnings(prev => ({ ...prev, api: true }))
+            message: "API Key missing. AI features are disabled.", 
+            actionLabel: "Configure in Admin",
+            onAction: handleAdminAccess
         }),
         supabaseMissing && React.createElement(SystemWarning, { 
-            message: "Supabase disconnected. Cloud features disabled.", 
-            actionLabel: "Info",
-            onAction: () => alert("Configure SUPABASE_URL in env.js to enable."),
-            onDismiss: () => setDismissedWarnings(prev => ({ ...prev, supabase: true }))
+            message: "Supabase not configured. Auth & Cloud Save disabled.", 
+            actionLabel: "Check Deployment",
+            onAction: null // No direct action for supabase missing in runtime usually
         })
     ),
 
