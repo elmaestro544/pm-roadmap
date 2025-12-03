@@ -112,6 +112,8 @@ const InputView = ({ onGenerate, initialData, isLoading, error }) => {
         budget: '',
         currency: 'USD',
         budgetType: 'Fixed', // Fixed vs Predicted
+        startDate: '',
+        finishDate: '',
         duration: ''
     });
 
@@ -166,12 +168,23 @@ const InputView = ({ onGenerate, initialData, isLoading, error }) => {
 
     // Smart Currency switching
     useEffect(() => {
-        // Only switch if currency hasn't been manually changed yet (simple check: matches default USD or previous map)
-        // For better UX, we just switch it when location changes, user can override back.
         if (formData.location && locationCurrencyMap[formData.location]) {
             setFormData(prev => ({ ...prev, currency: locationCurrencyMap[formData.location] }));
         }
     }, [formData.location]);
+
+    // Auto-calculate Duration based on dates
+    useEffect(() => {
+        if (formData.startDate && formData.finishDate) {
+            const start = new Date(formData.startDate);
+            const end = new Date(formData.finishDate);
+            if (end > start) {
+                const diffTime = Math.abs(end - start);
+                const diffMonths = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30.44)); // Average month days
+                setFormData(prev => ({ ...prev, duration: diffMonths }));
+            }
+        }
+    }, [formData.startDate, formData.finishDate]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -245,11 +258,37 @@ const InputView = ({ onGenerate, initialData, isLoading, error }) => {
                         min: '1',
                         value: formData.duration,
                         onChange: handleChange,
-                        placeholder: "e.g., 18",
+                        placeholder: "e.g., 18 (Calculated from dates if set)",
                         className: 'w-full p-3 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none'
                     })
                 )
             ),
+            
+            // Dates Section
+            React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4' },
+                React.createElement('div', null,
+                    React.createElement('label', { className: 'block text-sm font-medium text-brand-text-light mb-1' }, "Project Start Date"),
+                    React.createElement('input', {
+                        type: 'date',
+                        name: 'startDate',
+                        value: formData.startDate,
+                        onChange: handleChange,
+                        className: 'w-full p-3 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none placeholder-slate-500'
+                    })
+                ),
+                React.createElement('div', null,
+                    React.createElement('label', { className: 'block text-sm font-medium text-brand-text-light mb-1' }, "Project Finish Date"),
+                    React.createElement('input', {
+                        type: 'date',
+                        name: 'finishDate',
+                        value: formData.finishDate,
+                        onChange: handleChange,
+                        min: formData.startDate,
+                        className: 'w-full p-3 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none placeholder-slate-500'
+                    })
+                )
+            ),
+
             React.createElement('div', null,
                 React.createElement('label', { className: 'block text-sm font-medium text-brand-text-light mb-1' }, "Total Budget"),
                 React.createElement('div', { className: 'flex gap-2 mb-2' },
@@ -324,12 +363,14 @@ const ResultsView = ({ plan, criteria }) => {
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
     return React.createElement('div', { className: 'animate-fade-in-up max-w-5xl mx-auto' },
-        // Criteria Summary (Moved to top of content, non-printable or printable based on preference, usually good to print)
+        // Criteria Summary
         criteria && React.createElement('div', { className: 'mb-8 p-4 bg-dark-card-solid/50 border border-dark-border rounded-lg print:border-gray-300 print:bg-white print:text-black' },
             React.createElement('h4', { className: 'text-xs font-bold text-brand-purple-light uppercase mb-2 print:text-black' }, "Project Parameters"),
             React.createElement('div', { className: 'flex flex-wrap gap-4 text-sm text-brand-text-light print:text-black' },
                 React.createElement('span', null, React.createElement('strong', { className: "text-white print:text-black" }, "Location: "), criteria.location),
                 criteria.budget && React.createElement('span', null, React.createElement('strong', { className: "text-white print:text-black" }, "Budget: "), `${criteria.currency} ${criteria.budget} (${criteria.budgetType || 'Fixed'})`),
+                criteria.startDate && React.createElement('span', null, React.createElement('strong', { className: "text-white print:text-black" }, "Start: "), criteria.startDate),
+                criteria.finishDate && React.createElement('span', null, React.createElement('strong', { className: "text-white print:text-black" }, "Finish: "), criteria.finishDate),
                 criteria.duration && React.createElement('span', null, React.createElement('strong', { className: "text-white print:text-black" }, "Duration: "), `${criteria.duration} Months`)
             )
         ),

@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect } from 'react';
 import { i18n, DASHBOARD_VIEWS } from '../constants.js';
 import AssistantView from './SciGeniusChat.js';
@@ -140,13 +138,17 @@ const Sidebar = ({ language, activeView, setActiveView, isExpanded, setExpanded,
                     React.createElement('span', { className: 'text-brand-text-light' }, "Location"),
                     React.createElement('span', { className: 'text-white font-medium truncate max-w-[100px]', title: criteria.location }, criteria.location || '-')
                 ),
+                criteria.startDate && React.createElement('div', { className: 'flex justify-between items-center' },
+                    React.createElement('span', { className: 'text-brand-text-light' }, "Start"),
+                    React.createElement('span', { className: 'text-white font-medium' }, criteria.startDate)
+                ),
+                criteria.finishDate && React.createElement('div', { className: 'flex justify-between items-center' },
+                    React.createElement('span', { className: 'text-brand-text-light' }, "Finish"),
+                    React.createElement('span', { className: 'text-white font-medium' }, criteria.finishDate)
+                ),
                 React.createElement('div', { className: 'flex justify-between items-center' },
                     React.createElement('span', { className: 'text-brand-text-light' }, "Duration"),
                     React.createElement('span', { className: 'text-white font-medium' }, criteria.duration ? `${criteria.duration} Months` : '-')
-                ),
-                React.createElement('div', { className: 'flex justify-between items-center' },
-                    React.createElement('span', { className: 'text-brand-text-light' }, "Budget Type"),
-                    React.createElement('span', { className: `font-medium ${criteria.budgetType === 'Fixed' ? 'text-brand-pink' : 'text-brand-cyan'}` }, criteria.budgetType || '-')
                 ),
                 React.createElement('div', { className: 'pt-2 mt-2 border-t border-dark-border/50 flex justify-between items-end' },
                     React.createElement('span', { className: 'text-brand-text-light font-semibold' }, "Total"),

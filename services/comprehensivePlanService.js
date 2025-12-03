@@ -24,7 +24,7 @@ const consultingPlanSchema = {
 };
 
 export const generateConsultingPlan = async (details) => {
-    const { field, name, scope, location, budget, currency, duration, budgetType } = details;
+    const { field, name, scope, location, budget, currency, duration, budgetType, startDate, finishDate } = details;
     
     let constraints = "";
     
@@ -35,6 +35,13 @@ export const generateConsultingPlan = async (details) => {
     
     if (duration) {
         constraints += `Target Duration: ${duration} Months. `;
+    }
+
+    if (startDate) {
+        constraints += `Project Start Date: ${startDate}. `;
+    }
+    if (finishDate) {
+        constraints += `Target Finish Date: ${finishDate}. `;
     }
 
     const prompt = `

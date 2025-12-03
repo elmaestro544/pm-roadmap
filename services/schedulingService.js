@@ -4,7 +4,7 @@ import { generateAIContent } from "./geminiService.js";
 
 const ganttChartSchema = {
     type: Type.ARRAY,
-    description: "An array of tasks representing a project schedule.",
+    description: "An array of tasks representing a project schedule with cost and resources.",
     items: {
         type: Type.OBJECT,
         properties: {
@@ -15,33 +15,57 @@ const ganttChartSchema = {
             progress: { type: Type.NUMBER },
             type: { type: Type.STRING, description: "'project', 'task', or 'milestone'" },
             project: { type: Type.STRING, description: "Parent ID" },
-            dependencies: { type: Type.ARRAY, items: { type: Type.STRING } }
+            dependencies: { type: Type.ARRAY, items: { type: Type.STRING } },
+            cost: { type: Type.NUMBER, description: "Estimated cost for this specific task" },
+            resource: { type: Type.STRING, description: "Person or Role assigned (e.g. 'Civil Engineer')" }
         },
-        required: ['id', 'name', 'start', 'end', 'progress', 'type']
+        required: ['id', 'name', 'start', 'end', 'progress', 'type', 'cost', 'resource']
     }
 };
 
 export const generateScheduleFromPlan = async (projectPlan, criteria) => {
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const projectStartDate = tomorrow.toISOString().split('T')[0];
-
-    let durationConstraint = "";
-    if (criteria && criteria.duration) {
-        durationConstraint = `CRITICAL CONSTRAINT: The entire schedule from start to finish MUST fit within ${criteria.duration} months. Ensure the final task ends before this limit.`;
+    // Determine Project Start Date
+    let projectStartDate;
+    if (criteria && criteria.startDate) {
+        projectStartDate = criteria.startDate;
     } else {
-        durationConstraint = "Estimate a realistic timeline based on the scope.";
+        // Fallback: Tomorrow
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        projectStartDate = tomorrow.toISOString().split('T')[0];
+    }
+
+    const currency = criteria?.currency || 'USD';
+    const totalBudget = criteria?.budget || 0;
+
+    let constraints = "";
+    if (criteria) {
+        if (criteria.finishDate) {
+            constraints += `CRITICAL DEADLINE: The project MUST finish by ${criteria.finishDate}. `;
+        } else if (criteria.duration) {
+            constraints += `CRITICAL CONSTRAINT: The schedule MUST fit within ${criteria.duration} months. `;
+        }
     }
 
     const prompt = `
-        Create a Gantt chart schedule starting ${projectStartDate}.
-        ${durationConstraint}
+        Create a detailed, Cost-Loaded and Resource-Loaded Gantt chart schedule starting strictly on ${projectStartDate}.
+        ${constraints}
+        
         Project Plan: ${JSON.stringify(projectPlan, null, 2)}
-        Instructions: Convert WBS items/milestones to tasks. Assign 'id', 'start', 'end' dates. 'type' should be 'project' for phases, 'task' for items. Establish dependencies. Return JSON array.
+        
+        Instructions:
+        1. **Structure**: Convert WBS items to tasks. Use 'project' for phases/parents, 'task' for actionable items.
+        2. **Dates**: Calculate realistic start/end dates based on dependencies.
+        3. **Dependencies**: Logic is Key. Task B cannot start until Task A finishes. Populate 'dependencies' array with IDs of predecessors.
+        4. **Resource Loading**: Assign a specific Role or Resource Name to every task (e.g., "Site Foreman", "Architect", "Excavator").
+        5. **Cost Loading**: Distribute the estimated project value into individual task costs. 
+           ${totalBudget > 0 ? `The sum of all task costs MUST equal approximately ${totalBudget} ${currency}.` : `Estimate costs in ${currency}.`}
+        
+        Return a JSON array matching the schema.
     `;
 
-    const systemInstruction = "You are an expert AI Project Scheduler. Convert plans to Gantt schedules.";
+    const systemInstruction = "You are an expert AI Project Scheduler. You specialize in Critical Path Method (CPM), Resource Allocation, and Cost Estimation.";
 
     try {
         const jsonText = await generateAIContent(prompt, ganttChartSchema, systemInstruction);

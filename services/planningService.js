@@ -57,6 +57,13 @@ export const generateProjectPlan = async (objective, criteria) => {
             constraintText += `\nINSTRUCTION: Estimate a realistic duration for this project scope.`;
         }
         
+        if (criteria.startDate) {
+            constraintText += `\nSTART DATE: ${criteria.startDate}. Plan phases starting from this date.`;
+        }
+        if (criteria.finishDate) {
+            constraintText += `\nDEADLINE: ${criteria.finishDate}. All work must be completed by this date.`;
+        }
+        
         if (criteria.budget) {
             const type = criteria.budgetType === 'Fixed' ? "Strict Constraint" : "Guideline";
             constraintText += `\n${type}: Total Budget is ${criteria.currency} ${criteria.budget}. Ensure the scale of the WBS reflects this.`;

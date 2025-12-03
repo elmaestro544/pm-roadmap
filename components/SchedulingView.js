@@ -30,7 +30,7 @@ const LoadingView = () => (
     React.createElement('div', { className: 'text-center flex flex-col items-center h-full justify-center' },
         React.createElement(ScheduleIcon, { className: 'h-16 w-16 animate-pulse text-brand-purple-light' }),
         React.createElement('h2', { className: 'text-3xl font-bold mt-4 mb-2 text-white' }, "Building Schedule..."),
-        React.createElement('p', { className: 'text-brand-text-light mb-8' }, "AI is calculating critical paths, dependencies, and timelines."),
+        React.createElement('p', { className: 'text-brand-text-light mb-8' }, "Calculating critical path, assigning resources, and loading costs."),
         React.createElement(Spinner, { size: '12' })
     )
 );
@@ -58,8 +58,6 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
     const periods = useMemo(() => {
         const result = [];
         const current = new Date(dates.start);
-        
-        // Limit the loop to prevent crashes on huge ranges
         const safetyLimit = 1000; 
         let count = 0;
 
@@ -133,15 +131,48 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
         return 0;
     };
 
-    const totalWidth = periods.length * colWidth;
-    const taskListWidth = 300; // Fixed width for sticky column
+    const rowHeight = 40;
+    const taskListWidth = 300; 
+
+    // Dependency Lines Calculation
+    const dependencyLines = useMemo(() => {
+        const lines = [];
+        const taskYMap = new Map();
+        visibleTasks.forEach((t, i) => taskYMap.set(t.id, i * rowHeight + (rowHeight / 2)));
+
+        visibleTasks.forEach(task => {
+            if (task.dependencies && task.dependencies.length > 0) {
+                const endX = getLeftPos(task.start) + getWidth(task.start, task.end);
+                
+                // For each predecessor
+                task.dependencies.forEach(depId => {
+                    const predTask = tasks.find(t => t.id === depId);
+                    if (predTask && taskYMap.has(task.id) && taskYMap.has(depId)) {
+                        const startY = taskYMap.get(depId);
+                        const startX = getLeftPos(predTask.start) + getWidth(predTask.start, predTask.end);
+                        
+                        const endY = taskYMap.get(task.id);
+                        const targetX = getLeftPos(task.start);
+
+                        // Draw path
+                        lines.push({ 
+                            id: `${depId}-${task.id}`,
+                            d: `M ${startX} ${startY} 
+                                C ${startX + 20} ${startY}, ${targetX - 20} ${endY}, ${targetX} ${endY}` 
+                        });
+                    }
+                });
+            }
+        });
+        return lines;
+    }, [visibleTasks, tasks, dates, scale, zoom]);
 
     return React.createElement('div', { className: 'h-full w-full overflow-auto bg-dark-bg relative border border-dark-border rounded-xl scrollbar-thin' },
         React.createElement('div', { className: 'min-w-fit flex flex-col relative' },
             
             // --- Header Row (Sticky Top) ---
             React.createElement('div', { className: 'flex sticky top-0 z-30 bg-dark-card-solid border-b border-dark-border h-12' },
-                // Top Left Corner (Sticky Top & Left)
+                // Top Left Corner
                 React.createElement('div', { 
                     className: 'sticky left-0 z-40 w-[300px] flex-shrink-0 bg-dark-card-solid border-r border-dark-border flex items-center px-4 font-bold text-brand-text shadow-md',
                     style: { minWidth: taskListWidth, width: taskListWidth }
@@ -164,7 +195,7 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
             ),
 
             // --- Body Grid ---
-            // Background Grid Lines (Absolute to body)
+            // Background Grid Lines
             React.createElement('div', { className: 'absolute top-12 bottom-0 left-[300px] flex pointer-events-none z-0' },
                 periods.map((p, i) => 
                     React.createElement('div', { 
@@ -172,6 +203,26 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                         className: 'flex-shrink-0 border-r border-dark-border/30 h-full',
                         style: { width: colWidth }
                     })
+                )
+            ),
+
+            // Relations Overlay (SVG)
+            React.createElement('svg', { className: 'absolute top-12 left-[300px] pointer-events-none z-10 w-full h-full' },
+                dependencyLines.map(line => 
+                    React.createElement('path', {
+                        key: line.id,
+                        d: line.d,
+                        fill: "none",
+                        stroke: "#5EEAD4", // brand-purple-light
+                        strokeWidth: "1.5",
+                        opacity: "0.5",
+                        markerEnd: "url(#arrowhead)"
+                    })
+                ),
+                React.createElement('defs', null,
+                    React.createElement('marker', { id: "arrowhead", markerWidth: "6", markerHeight: "7", refX: "5", refY: "3.5", orient: "auto" },
+                        React.createElement('polygon', { points: "0 0, 6 3.5, 0 7", fill: "#5EEAD4" })
+                    )
                 )
             ),
 
@@ -197,23 +248,27 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                     ),
 
                     // Timeline Bar Area
-                    React.createElement('div', { className: 'relative flex-grow z-10' },
+                    React.createElement('div', { className: 'relative flex-grow z-20' }, // z-20 to be above lines
                         React.createElement('div', {
-                            className: `absolute top-2 h-6 rounded-md shadow-sm text-[10px] text-white whitespace-nowrap overflow-hidden flex items-center`,
+                            className: `absolute top-2 h-6 rounded-md shadow-sm text-[10px] text-white whitespace-nowrap overflow-visible flex items-center`,
                             style: { 
                                 left: left, 
                                 width: width,
-                                // Background Track Color
                                 backgroundColor: isProject ? '#2DD4BF' : 'rgba(45, 212, 191, 0.15)', 
                             }
                         },
-                            // Progress Fill (The actual percentage)
+                            // Progress Fill
                             !isProject && React.createElement('div', {
                                 className: 'h-full bg-gradient-to-r from-brand-purple to-brand-purple-light absolute left-0 top-0 rounded-l-md transition-all duration-500',
                                 style: { width: `${task.progress}%` }
                             }),
                             
-                            // Label
+                            // Resource Label (Right of bar)
+                            !isProject && React.createElement('span', { 
+                                className: 'absolute left-full ml-2 text-xs text-brand-text-light font-medium truncate pointer-events-none' 
+                            }, task.resource),
+
+                            // % Label (Inside)
                             React.createElement('span', { className: `relative z-10 px-2 ${isProject ? 'font-bold' : ''}` },
                                 width > 40 ? `${task.progress}%` : ''
                             )
@@ -244,6 +299,10 @@ const BoardView = ({ tasks }) => {
                     colTasks.map(task => 
                         React.createElement('div', { key: task.id, className: 'bg-dark-card p-4 rounded-lg border border-dark-border shadow-sm hover:border-brand-purple/50 transition-colors group cursor-pointer' },
                             React.createElement('p', { className: 'font-semibold text-white text-sm mb-2 group-hover:text-brand-purple-light transition-colors' }, task.name),
+                            React.createElement('div', { className: 'text-xs text-brand-text-light mb-2' },
+                                React.createElement('span', { className: "block" }, `Resource: ${task.resource || '-'}`),
+                                task.cost && React.createElement('span', { className: "block" }, `Cost: $${task.cost.toLocaleString()}`)
+                            ),
                             React.createElement('div', { className: 'flex justify-between items-center text-xs text-brand-text-light' },
                                 React.createElement('span', { className: 'flex items-center gap-1' }, 
                                     React.createElement('span', {className: "opacity-50"}, "Due:"), 
@@ -264,7 +323,7 @@ const BoardView = ({ tasks }) => {
     );
 };
 
-const EditableListView = ({ tasks, onUpdate }) => (
+const EditableListView = ({ tasks, onUpdate, currency }) => (
     React.createElement('div', { className: 'h-full overflow-auto bg-dark-card rounded-xl border border-dark-border print:bg-white print:border-gray-300' },
         React.createElement('table', { className: 'w-full text-left text-sm' },
             React.createElement('thead', { className: 'bg-dark-card-solid text-brand-text-light sticky top-0 z-10 print:bg-gray-100 print:text-black' },
@@ -272,8 +331,10 @@ const EditableListView = ({ tasks, onUpdate }) => (
                     React.createElement('th', { className: 'p-4 font-semibold' }, "Task Name"),
                     React.createElement('th', { className: 'p-4 font-semibold' }, "Start Date"),
                     React.createElement('th', { className: 'p-4 font-semibold' }, "End Date"),
+                    React.createElement('th', { className: 'p-4 font-semibold' }, "Resource"),
+                    React.createElement('th', { className: 'p-4 font-semibold' }, `Cost (${currency})`),
                     React.createElement('th', { className: 'p-4 font-semibold' }, "Progress"),
-                    React.createElement('th', { className: 'p-4 font-semibold' }, "Dependencies")
+                    React.createElement('th', { className: 'p-4 font-semibold' }, "Predecessors")
                 )
             ),
             React.createElement('tbody', { className: 'divide-y divide-dark-border print:divide-gray-200' },
@@ -303,17 +364,40 @@ const EditableListView = ({ tasks, onUpdate }) => (
                             })
                         ),
                         React.createElement('td', { className: 'p-4' },
+                             React.createElement('input', {
+                                value: task.resource || '',
+                                onChange: (e) => onUpdate(task.id, 'resource', e.target.value),
+                                placeholder: "Unassigned",
+                                className: "bg-transparent w-full outline-none text-brand-text-light print:text-black"
+                            })
+                        ),
+                        React.createElement('td', { className: 'p-4' },
+                             React.createElement('input', {
+                                type: "number",
+                                value: task.cost || 0,
+                                onChange: (e) => onUpdate(task.id, 'cost', parseFloat(e.target.value)),
+                                className: "bg-transparent w-24 outline-none text-brand-text-light print:text-black"
+                            })
+                        ),
+                        React.createElement('td', { className: 'p-4' },
                              React.createElement('div', { className: 'flex items-center gap-2' },
                                 React.createElement('input', {
                                     type: 'range', min: 0, max: 100,
                                     value: task.progress,
                                     onChange: (e) => onUpdate(task.id, 'progress', parseInt(e.target.value)),
-                                    className: "w-24 h-1.5 bg-dark-bg rounded-lg appearance-none cursor-pointer accent-brand-purple"
+                                    className: "w-16 h-1.5 bg-dark-bg rounded-lg appearance-none cursor-pointer accent-brand-purple"
                                 }),
                                 React.createElement('span', { className: 'w-8 text-right' }, `${task.progress}%`)
                              )
                         ),
-                        React.createElement('td', { className: 'p-4 text-brand-text-light print:text-gray-600' }, task.dependencies?.join(', ') || '-')
+                        React.createElement('td', { className: 'p-4' },
+                             React.createElement('input', {
+                                value: task.dependencies?.join(', ') || '',
+                                onChange: (e) => onUpdate(task.id, 'dependencies', e.target.value.split(',').map(s=>s.trim())),
+                                placeholder: "-",
+                                className: "bg-transparent w-full outline-none text-brand-text-light print:text-black"
+                            })
+                        )
                     )
                 )
             )
@@ -389,7 +473,11 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
 
         switch (viewMode) {
             case 'list':
-                return React.createElement(EditableListView, { tasks: projectData.schedule, onUpdate: handleUpdateTask });
+                return React.createElement(EditableListView, { 
+                    tasks: projectData.schedule, 
+                    onUpdate: handleUpdateTask,
+                    currency: projectData.criteria?.currency || 'USD'
+                });
             case 'board':
                 return React.createElement(BoardView, { tasks: projectData.schedule });
             default:
