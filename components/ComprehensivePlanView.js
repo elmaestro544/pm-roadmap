@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { generateConsultingPlan } from '../services/comprehensivePlanService.js';
 import { DocumentIcon, Spinner, FeatureToolbar, EditIcon, RefreshIcon } from './Shared.js';
@@ -172,52 +173,22 @@ const InputView = ({ onGenerate, initialData, isLoading, error }) => {
         }
     }, [formData.location]);
 
-    const handleDateCalculation = (updatedData, changedField) => {
-        const { startDate, finishDate, duration } = updatedData;
-        
-        // Case 1: Duration Changed OR Start Date Changed -> Calculate Finish Date
-        // Priority: If Duration is present, it drives the Finish Date
-        if ((changedField === 'startDate' || changedField === 'duration') && startDate && duration) {
-            const start = new Date(startDate);
-            const months = parseFloat(duration);
-            
-            if (!isNaN(months) && start.toString() !== 'Invalid Date') {
-                const end = new Date(start);
-                // Add months (approximate logic, handling year rollover)
-                end.setMonth(end.getMonth() + parseInt(months));
-                // Handle partial months if float was passed (e.g. 1.5 months = +15 days)
-                const remainder = months % 1;
-                if (remainder > 0) {
-                    end.setDate(end.getDate() + Math.round(remainder * 30));
-                }
-                updatedData.finishDate = end.toISOString().split('T')[0];
-            }
-        }
-        // Case 2: Finish Date Changed -> Calculate Duration
-        else if (changedField === 'finishDate' && startDate && finishDate) {
-            const start = new Date(startDate);
-            const end = new Date(finishDate);
-            if (start.toString() !== 'Invalid Date' && end.toString() !== 'Invalid Date' && end > start) {
+    // Auto-calculate Duration based on dates
+    useEffect(() => {
+        if (formData.startDate && formData.finishDate) {
+            const start = new Date(formData.startDate);
+            const end = new Date(formData.finishDate);
+            if (end > start) {
                 const diffTime = Math.abs(end - start);
-                // Average days per month = 30.44
-                const diffMonths = (diffTime / (1000 * 60 * 60 * 24 * 30.44)).toFixed(1);
-                // Remove decimal if it's .0
-                updatedData.duration = diffMonths.endsWith('.0') ? diffMonths.slice(0, -2) : diffMonths;
+                const diffMonths = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30.44)); // Average month days
+                setFormData(prev => ({ ...prev, duration: diffMonths }));
             }
         }
-        return updatedData;
-    };
+    }, [formData.startDate, formData.finishDate]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        let newData = { ...formData, [name]: value };
-        
-        // Trigger date calculation logic
-        if (['startDate', 'finishDate', 'duration'].includes(name)) {
-            newData = handleDateCalculation(newData, name);
-        }
-
-        setFormData(newData);
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
     const isFormValid = formData.field && formData.name && formData.scope && formData.location;
@@ -284,11 +255,10 @@ const InputView = ({ onGenerate, initialData, isLoading, error }) => {
                     React.createElement('input', {
                         name: 'duration',
                         type: 'number',
-                        step: "0.1",
-                        min: '0.1',
+                        min: '1',
                         value: formData.duration,
                         onChange: handleChange,
-                        placeholder: "e.g., 18",
+                        placeholder: "e.g., 18 (Calculated from dates if set)",
                         className: 'w-full p-3 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none'
                     })
                 )

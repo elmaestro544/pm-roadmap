@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 export const Spinner = ({ size = '8' }) => (
@@ -243,6 +242,7 @@ export const CollapseIcon = () => React.createElement('svg', toolbarIconProps, R
 export const EditIcon = () => React.createElement('svg', toolbarIconProps, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" }));
 export const ExportIcon = () => React.createElement('svg', toolbarIconProps, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" }));
 export const RefreshIcon = () => React.createElement('svg', toolbarIconProps, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" }));
+export const MaximizeIcon = () => React.createElement('svg', toolbarIconProps, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" }));
 
 
 // --- New Feature Toolbar Component ---

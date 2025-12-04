@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { FeatureToolbar, RefreshIcon, Spinner, ExportIcon, DocumentIcon, ExpandIcon, CollapseIcon, CloseIcon } from './Shared.js';
+import React, { useMemo, useState, useRef } from 'react';
+import { FeatureToolbar, RefreshIcon, Spinner, ExportIcon, DocumentIcon, MaximizeIcon, CloseIcon } from './Shared.js';
 import { i18n } from '../constants.js';
 
 // --- Infographics Components ---
@@ -34,7 +34,7 @@ const RadialProgress = ({ progress, size = 80, strokeWidth = 8, color = '#2DD4BF
 
 const StackedBar = ({ segments, height = 12 }) => {
     const total = segments.reduce((acc, s) => acc + s.value, 0);
-    return React.createElement('div', { className: `w-full flex rounded-full overflow-hidden h-4 bg-dark-bg print:bg-gray-200` }, // Fixed height class
+    return React.createElement('div', { className: `w-full flex rounded-full overflow-hidden h-4 bg-dark-bg print:bg-gray-200` }, 
         segments.map((seg, i) => {
             const width = total > 0 ? (seg.value / total) * 100 : 0;
             return React.createElement('div', {
@@ -45,6 +45,55 @@ const StackedBar = ({ segments, height = 12 }) => {
         })
     );
 };
+
+// --- Mini Gantt Chart Component ---
+const MiniGantt = ({ tasks }) => {
+    if (!tasks || tasks.length === 0) return null;
+
+    // Filter mainly high-level tasks/phases for the overview
+    // If we have 'project' type tasks (phases), use those. Otherwise take a slice of tasks.
+    let displayTasks = tasks.filter(t => t.type === 'project');
+    if (displayTasks.length === 0) displayTasks = tasks.slice(0, 5); // Fallback
+    
+    // Sort by start date
+    displayTasks.sort((a, b) => new Date(a.start) - new Date(b.start));
+
+    // Determine timeline bounds
+    const startDates = displayTasks.map(t => new Date(t.start).getTime());
+    const endDates = displayTasks.map(t => new Date(t.end).getTime());
+    const minTime = Math.min(...startDates);
+    const maxTime = Math.max(...endDates);
+    const totalDuration = maxTime - minTime;
+
+    return React.createElement('div', { className: 'w-full space-y-3 mt-2' },
+        displayTasks.map(task => {
+            const start = new Date(task.start).getTime();
+            const end = new Date(task.end).getTime();
+            const left = totalDuration > 0 ? ((start - minTime) / totalDuration) * 100 : 0;
+            const width = totalDuration > 0 ? ((end - start) / totalDuration) * 100 : 100;
+            const isCompleted = task.progress === 100;
+
+            return React.createElement('div', { key: task.id, className: 'relative' },
+                React.createElement('div', { className: 'flex justify-between text-xs mb-1' },
+                    React.createElement('span', { className: 'text-white font-medium truncate w-32' }, task.name),
+                    React.createElement('span', { className: 'text-brand-text-light' }, `${task.progress}%`)
+                ),
+                React.createElement('div', { className: 'w-full h-2 bg-dark-bg rounded-full overflow-hidden relative' },
+                    React.createElement('div', {
+                        className: `absolute h-full rounded-full ${isCompleted ? 'bg-green-500' : 'bg-brand-purple'}`,
+                        style: { left: `${left}%`, width: `${Math.max(width, 1)}%` }
+                    })
+                )
+            );
+        }),
+        // Time Axis
+        React.createElement('div', { className: 'flex justify-between text-[10px] text-brand-text-light mt-2 pt-2 border-t border-dark-border' },
+            React.createElement('span', null, new Date(minTime).toLocaleDateString()),
+            React.createElement('span', null, new Date(maxTime).toLocaleDateString())
+        )
+    );
+};
+
 
 // --- Expandable Widget Wrapper ---
 const DashboardWidget = ({ title, children, expandedContent, className = '', headerAction }) => {
@@ -61,7 +110,7 @@ const DashboardWidget = ({ title, children, expandedContent, className = '', hea
                         onClick: () => setIsExpanded(true),
                         className: 'p-1.5 rounded-full hover:bg-white/10 text-brand-text-light print:text-gray-500 hover:text-white transition-colors',
                         title: "Expand details"
-                    }, React.createElement(ExpandIcon, { className: "w-4 h-4" }))
+                    }, React.createElement(MaximizeIcon, { className: "w-4 h-4" }))
                 )
             ),
             React.createElement('div', { className: 'flex-grow min-h-0' }, children)
@@ -69,11 +118,11 @@ const DashboardWidget = ({ title, children, expandedContent, className = '', hea
 
         // Expanded Modal View
         isExpanded && React.createElement('div', {
-            className: 'fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex justify-center items-center p-6 animate-fade-in-up',
+            className: 'fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex justify-center items-center p-6 animate-fade-in-up',
             onClick: () => setIsExpanded(false)
         },
             React.createElement('div', {
-                className: 'bg-dark-card w-full max-w-5xl h-[85vh] rounded-2xl border border-dark-border shadow-2xl flex flex-col overflow-hidden',
+                className: 'bg-dark-card w-full max-w-6xl h-[90vh] rounded-2xl border border-dark-border shadow-2xl flex flex-col overflow-hidden',
                 onClick: e => e.stopPropagation()
             },
                 React.createElement('div', { className: 'flex justify-between items-center p-6 border-b border-dark-border bg-dark-card-solid' },
@@ -92,7 +141,7 @@ const DashboardWidget = ({ title, children, expandedContent, className = '', hea
 };
 
 
-// --- Specific Widgets ---
+// --- Specific Widgets --- (HealthCard, ResourceHeatmap, BudgetBurndown, etc. unchanged logic, simplified for brevity in rendering)
 
 const HealthCard = ({ progress, spi, cpi }) => {
     const status = (spi || 1) >= 1 && (cpi || 1) >= 1 ? 'Healthy' : ((spi || 1) < 0.9 || (cpi || 1) < 0.9) ? 'Critical' : 'At Risk';
@@ -120,7 +169,6 @@ const HealthCard = ({ progress, spi, cpi }) => {
 };
 
 const ResourceHeatmap = ({ schedule }) => {
-    // Determine utilization
     const utilization = useMemo(() => {
         if (!schedule || !Array.isArray(schedule)) return {};
         const map = {};
@@ -133,7 +181,7 @@ const ResourceHeatmap = ({ schedule }) => {
         return map;
     }, [schedule]);
 
-    const resources = Object.entries(utilization).sort((a, b) => b[1].pending - a[1].pending).slice(0, 5); // Top 5 busy
+    const resources = Object.entries(utilization).sort((a, b) => b[1].pending - a[1].pending).slice(0, 5);
 
     const ExpandedView = (
         React.createElement('div', { className: 'space-y-6' },
@@ -183,10 +231,9 @@ const ResourceHeatmap = ({ schedule }) => {
 };
 
 const BudgetBurndown = ({ budget, currency = 'USD', kpi }) => {
-    // Mock burndown data calculation based on KPI
     const totalBudget = kpi?.budgetAtCompletion || 0;
     const earnedValue = totalBudget * ((kpi?.overallProgress || 0) / 100);
-    const actualCost = earnedValue / (kpi?.cpi || 1); // Avoid div by zero, cpi default to 1
+    const actualCost = earnedValue / (kpi?.cpi || 1); 
     
     const format = (v) => {
         try {
@@ -213,7 +260,6 @@ const BudgetBurndown = ({ budget, currency = 'USD', kpi }) => {
                 )
             ),
             React.createElement('h4', { className: 'text-lg font-bold text-white mb-4' }, "Cost Breakdown"),
-            // Use FinancialWidget-style breakdown here for detail
             budget?.budgetItems && (
                 React.createElement('table', { className: 'w-full text-left text-sm' },
                     React.createElement('thead', { className: 'bg-dark-bg text-brand-text-light' },
@@ -261,10 +307,9 @@ const BudgetBurndown = ({ budget, currency = 'USD', kpi }) => {
     );
 };
 
-const MilestonesWidget = ({ milestones }) => {
-    // Milestones usually come from Plan or Schedule
-    // If not direct, we extract from schedule (type='milestone')
+const MilestonesWidget = ({ milestones, schedule }) => {
     
+    // Expanded view logic (unchanged)
     const ExpandedView = (
         React.createElement('div', { className: 'space-y-4' },
             React.createElement('p', { className: 'text-brand-text-light' }, "Key project checkpoints and deliverables."),
@@ -290,19 +335,11 @@ const MilestonesWidget = ({ milestones }) => {
         )
     );
 
-    // Mini View (Top 3 upcoming)
-    const upcoming = milestones ? milestones.filter(m => !m.completed).slice(0, 3) : [];
-
-    return React.createElement(DashboardWidget, { title: "Key Milestones", expandedContent: ExpandedView },
-        React.createElement('div', { className: 'space-y-3' },
-            upcoming.length > 0 ? upcoming.map((m, i) => (
-                React.createElement('div', { key: i, className: 'flex items-center gap-3 border-l-2 border-brand-purple pl-3' },
-                    React.createElement('div', { className: 'flex-grow' },
-                        React.createElement('p', { className: 'text-sm font-medium text-white truncate' }, m.name),
-                        React.createElement('p', { className: 'text-xs text-brand-text-light' }, m.date)
-                    )
-                )
-            )) : React.createElement('p', { className: 'text-xs text-brand-text-light italic' }, "No upcoming milestones found.")
+    return React.createElement(DashboardWidget, { title: "Project Timeline & Milestones", expandedContent: ExpandedView },
+        React.createElement('div', { className: 'h-full flex flex-col' },
+             schedule && schedule.length > 0 
+                ? React.createElement(MiniGantt, { tasks: schedule })
+                : React.createElement('div', { className: 'h-32 bg-dark-bg/50 rounded-lg flex items-center justify-center text-sm text-brand-text-light border border-dark-border border-dashed' }, "No timeline data available.")
         )
     );
 };
@@ -311,15 +348,14 @@ const RiskRadarWidget = ({ risks }) => {
     const list = risks?.risks || [];
     const high = list.filter(r => r.severity === 'High').length;
     
-    // Calculate category distribution (Mocked categories based on standard types if not in data)
+    // Categories calculation logic (unchanged)
     const categories = { 'Schedule': 0, 'Cost': 0, 'Scope': 0, 'Resource': 0 };
     list.forEach(r => {
-        // Simple heuristic mapping based on keywords
         const txt = (r.title + r.description).toLowerCase();
         if (txt.includes('delay') || txt.includes('time')) categories['Schedule']++;
         else if (txt.includes('budget') || txt.includes('cost')) categories['Cost']++;
         else if (txt.includes('scope') || txt.includes('requirement')) categories['Scope']++;
-        else categories['Resource']++; // Default bucket
+        else categories['Resource']++; 
     });
 
     const ExpandedView = (
@@ -469,6 +505,7 @@ const ProjectOverview = ({ language, projectData }) => {
     const currency = projectData?.criteria?.currency || 'USD';
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [showExportMenu, setShowExportMenu] = useState(false);
+    const fullscreenRef = useRef(null); // Added ref
 
     const handleRefresh = () => {
         setIsRefreshing(true);
@@ -572,10 +609,11 @@ const ProjectOverview = ({ language, projectData }) => {
         )
     );
 
-    return React.createElement('div', { className: 'h-full flex flex-col bg-dark-bg text-white printable-container' },
+    return React.createElement('div', { ref: fullscreenRef, className: 'h-full flex flex-col bg-dark-bg text-white printable-container' },
         React.createElement(FeatureToolbar, {
             title: t.dashboardOverview,
-            customControls: customControls
+            customControls: customControls,
+            containerRef: fullscreenRef // Passed ref for fullscreen logic
         }),
         React.createElement('div', { className: 'flex-grow p-6 overflow-y-auto' },
             React.createElement('div', { className: 'max-w-7xl mx-auto' },
@@ -618,13 +656,10 @@ const ProjectOverview = ({ language, projectData }) => {
                         ),
                         React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-6' },
                             React.createElement('div', { className: 'md:col-span-2' },
-                                // Simplified Gantt Placeholder for Overview
-                                React.createElement('div', { className: 'h-32 bg-dark-bg/50 rounded-lg flex items-center justify-center text-sm text-brand-text-light border border-dark-border border-dashed' },
-                                    "Gantt Preview (Visit Scheduling tab for full details)"
-                                )
+                                React.createElement(MiniGantt, { tasks: projectData?.schedule })
                             ),
                             React.createElement('div', { className: 'md:col-span-1' },
-                                React.createElement(MilestonesWidget, { milestones })
+                                React.createElement(MilestonesWidget, { milestones, schedule: projectData?.schedule })
                             )
                         )
                     )
