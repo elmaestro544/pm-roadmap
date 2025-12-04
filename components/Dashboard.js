@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { i18n, DASHBOARD_VIEWS } from '../constants.js';
-import AssistantView from './SciGeniusChat.js';
+import AssistantView from './Chat.js'; 
 import AuthRequired from './AuthRequired.js';
 import UpgradeRequired from './UpgradeRequired.js';
 import PlanningView from './PlanningView.js';
@@ -12,7 +11,7 @@ import StructureView from './StructureView.js';
 import KpiView from './KpiView.js';
 import SCurveView from './SCurveView.js';
 import ComprehensivePlanView from './ComprehensivePlanView.js';
-import ProjectOverview from './ProjectOverview.js'; // New Import
+import ProjectOverview from './ProjectOverview.js'; 
 import { UserIcon, SidebarToggleIcon, Logo, Spinner, HistoryIcon, PlusIcon, ChevronRightIcon } from './Shared.js';
 import { getUserProjects, getProjectDetails, saveProject } from '../services/supabaseClient.js';
 
@@ -177,7 +176,7 @@ const Sidebar = ({ language, activeView, setActiveView, isExpanded, setExpanded,
 
 
 const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick, initialProjectId, onBackToProjects }) => {
-  const [activeView, setActiveView] = useState('overview'); // Changed default to overview
+  const [activeView, setActiveView] = useState('overview'); 
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [projectData, setProjectData] = useState({});
   const [currentProjectId, setCurrentProjectId] = useState(initialProjectId);
