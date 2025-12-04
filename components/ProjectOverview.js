@@ -7,7 +7,7 @@ import { i18n } from '../constants.js';
 const RadialProgress = ({ progress, size = 80, strokeWidth = 8, color = '#2DD4BF' }) => {
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
-    const offset = circumference - (progress / 100) * circumference;
+    const offset = circumference - (Math.min(Math.max(progress || 0, 0), 100) / 100) * circumference;
 
     return React.createElement('div', { className: 'relative flex items-center justify-center' },
         React.createElement('svg', { width: size, height: size, viewBox: `0 0 ${size} ${size}`, className: 'transform -rotate-90' },
@@ -28,13 +28,13 @@ const RadialProgress = ({ progress, size = 80, strokeWidth = 8, color = '#2DD4BF
                 style: { transition: 'stroke-dashoffset 1s ease-out' }
             })
         ),
-        React.createElement('span', { className: 'absolute text-sm font-bold text-white print:text-black' }, `${Math.round(progress)}%`)
+        React.createElement('span', { className: 'absolute text-sm font-bold text-white print:text-black' }, `${Math.round(progress || 0)}%`)
     );
 };
 
 const StackedBar = ({ segments, height = 12 }) => {
     const total = segments.reduce((acc, s) => acc + s.value, 0);
-    return React.createElement('div', { className: `w-full flex rounded-full overflow-hidden h-${height/4} bg-dark-bg print:bg-gray-200` },
+    return React.createElement('div', { className: `w-full flex rounded-full overflow-hidden h-4 bg-dark-bg print:bg-gray-200` }, // Fixed height class
         segments.map((seg, i) => {
             const width = total > 0 ? (seg.value / total) * 100 : 0;
             return React.createElement('div', {
@@ -95,25 +95,25 @@ const DashboardWidget = ({ title, children, expandedContent, className = '', hea
 // --- Specific Widgets ---
 
 const HealthCard = ({ progress, spi, cpi }) => {
-    const status = spi >= 1 && cpi >= 1 ? 'Healthy' : (spi < 0.9 || cpi < 0.9) ? 'Critical' : 'At Risk';
+    const status = (spi || 1) >= 1 && (cpi || 1) >= 1 ? 'Healthy' : ((spi || 1) < 0.9 || (cpi || 1) < 0.9) ? 'Critical' : 'At Risk';
     const statusColor = status === 'Healthy' ? 'text-green-400 print:text-green-700' : status === 'Critical' ? 'text-red-400 print:text-red-700' : 'text-yellow-400 print:text-yellow-700';
     
     return React.createElement(DashboardWidget, { title: "Project Health" },
         React.createElement('div', { className: 'flex justify-between items-center h-full' },
             React.createElement('div', null,
                 React.createElement('p', { className: `text-3xl font-bold ${statusColor}` }, status),
-                React.createElement('p', { className: 'text-sm text-brand-text-light mt-1' }, `${progress}% Complete`)
+                React.createElement('p', { className: 'text-sm text-brand-text-light mt-1' }, `${Math.round(progress || 0)}% Complete`)
             ),
             React.createElement(RadialProgress, { progress: progress || 0, color: status === 'Healthy' ? '#4ADE80' : status === 'Critical' ? '#F87171' : '#FACC15', size: 70 })
         ),
         React.createElement('div', { className: 'grid grid-cols-2 gap-2 mt-4' },
             React.createElement('div', { className: 'bg-dark-bg/50 p-2 rounded text-center' },
                 React.createElement('span', { className: 'block text-xs text-brand-text-light' }, "SPI"),
-                React.createElement('span', { className: `font-bold ${spi >= 1 ? 'text-green-400' : 'text-red-400'}` }, spi)
+                React.createElement('span', { className: `font-bold ${(spi || 1) >= 1 ? 'text-green-400' : 'text-red-400'}` }, spi || 1)
             ),
             React.createElement('div', { className: 'bg-dark-bg/50 p-2 rounded text-center' },
                 React.createElement('span', { className: 'block text-xs text-brand-text-light' }, "CPI"),
-                React.createElement('span', { className: `font-bold ${cpi >= 1 ? 'text-green-400' : 'text-red-400'}` }, cpi)
+                React.createElement('span', { className: `font-bold ${(cpi || 1) >= 1 ? 'text-green-400' : 'text-red-400'}` }, cpi || 1)
             )
         )
     );
@@ -122,7 +122,7 @@ const HealthCard = ({ progress, spi, cpi }) => {
 const ResourceHeatmap = ({ schedule }) => {
     // Determine utilization
     const utilization = useMemo(() => {
-        if (!schedule) return {};
+        if (!schedule || !Array.isArray(schedule)) return {};
         const map = {};
         schedule.filter(t => t.type === 'task').forEach(t => {
             const res = t.resource || 'Unassigned';
@@ -182,13 +182,19 @@ const ResourceHeatmap = ({ schedule }) => {
     );
 };
 
-const BudgetBurndown = ({ budget, currency, kpi }) => {
+const BudgetBurndown = ({ budget, currency = 'USD', kpi }) => {
     // Mock burndown data calculation based on KPI
     const totalBudget = kpi?.budgetAtCompletion || 0;
     const earnedValue = totalBudget * ((kpi?.overallProgress || 0) / 100);
-    const actualCost = earnedValue / (kpi?.cpi || 1);
+    const actualCost = earnedValue / (kpi?.cpi || 1); // Avoid div by zero, cpi default to 1
     
-    const format = (v) => new Intl.NumberFormat('en-US', { style: 'currency', currency, notation: "compact" }).format(v);
+    const format = (v) => {
+        try {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency, notation: "compact" }).format(v || 0);
+        } catch {
+            return `${currency} ${v}`;
+        }
+    };
 
     const ExpandedView = (
         React.createElement('div', null,
@@ -220,10 +226,11 @@ const BudgetBurndown = ({ budget, currency, kpi }) => {
                     React.createElement('tbody', { className: 'divide-y divide-dark-border' },
                         budget.budgetItems.map((item, i) => {
                             const cost = item.laborCost + item.materialsCost;
+                            const percent = totalBudget > 0 ? Math.round((cost/totalBudget)*100) : 0;
                             return React.createElement('tr', { key: i },
                                 React.createElement('td', { className: 'p-3 text-white' }, item.category),
                                 React.createElement('td', { className: 'p-3 text-brand-text-light' }, format(cost)),
-                                React.createElement('td', { className: 'p-3 text-brand-text-light' }, `${Math.round((cost/totalBudget)*100)}%`)
+                                React.createElement('td', { className: 'p-3 text-brand-text-light' }, `${percent}%`)
                             );
                         })
                     )
@@ -232,16 +239,18 @@ const BudgetBurndown = ({ budget, currency, kpi }) => {
         )
     );
 
+    const percentUtilized = totalBudget > 0 ? Math.min((actualCost / totalBudget) * 100, 100) : 0;
+
     return React.createElement(DashboardWidget, { title: "Budget Burndown", expandedContent: ExpandedView },
         React.createElement('div', { className: 'flex flex-col h-full justify-between' },
             React.createElement('div', { className: 'text-center py-2' },
                 React.createElement('p', { className: 'text-xs text-brand-text-light mb-1' }, "Budget Utilized"),
-                React.createElement('p', { className: 'text-3xl font-bold text-white' }, `${Math.round((actualCost / totalBudget) * 100) || 0}%`)
+                React.createElement('p', { className: 'text-3xl font-bold text-white' }, `${Math.round(percentUtilized)}%`)
             ),
             React.createElement('div', { className: 'w-full bg-slate-700 h-3 rounded-full overflow-hidden' },
                 React.createElement('div', { 
                     className: `h-full ${actualCost > totalBudget ? 'bg-red-500' : 'bg-green-500'}`, 
-                    style: { width: `${Math.min((actualCost/totalBudget)*100, 100)}%` } 
+                    style: { width: `${percentUtilized}%` } 
                 })
             ),
             React.createElement('div', { className: 'flex justify-between text-xs text-brand-text-light mt-2' },
@@ -263,8 +272,8 @@ const MilestonesWidget = ({ milestones }) => {
                 milestones.map((m, i) => (
                     React.createElement('div', { key: i, className: 'flex gap-4 p-4 bg-dark-bg rounded-lg border border-dark-border' },
                         React.createElement('div', { className: 'flex-shrink-0 w-12 text-center' },
-                            React.createElement('div', { className: 'text-xs text-brand-text-light uppercase' }, new Date(m.date).toLocaleString('default', { month: 'short' })),
-                            React.createElement('div', { className: 'text-xl font-bold text-white' }, new Date(m.date).getDate())
+                            React.createElement('div', { className: 'text-xs text-brand-text-light uppercase' }, m.date ? new Date(m.date).toLocaleString('default', { month: 'short' }) : ''),
+                            React.createElement('div', { className: 'text-xl font-bold text-white' }, m.date ? new Date(m.date).getDate() : '')
                         ),
                         React.createElement('div', { className: 'flex-grow' },
                             React.createElement('h4', { className: 'font-bold text-white' }, m.name),
@@ -348,6 +357,8 @@ const RiskRadarWidget = ({ risks }) => {
         )
     );
 
+    const safeListLength = Math.max(list.length, 1);
+
     return React.createElement(DashboardWidget, { title: "Risk Exposure", expandedContent: ExpandedView },
         React.createElement('div', { className: 'flex flex-col items-center justify-center h-full gap-2' },
             React.createElement('div', { className: 'text-center' },
@@ -355,8 +366,8 @@ const RiskRadarWidget = ({ risks }) => {
                 React.createElement('span', { className: 'block text-xs text-brand-text-light uppercase tracking-wide' }, "Critical Risks")
             ),
             React.createElement('div', { className: 'w-full flex gap-1 h-2 mt-2' },
-                React.createElement('div', { className: 'bg-red-500 h-full rounded-l', style: { width: `${(high/list.length)*100}%` } }),
-                React.createElement('div', { className: 'bg-yellow-500 h-full', style: { width: `${((list.length-high)/list.length)*100}%` } })
+                React.createElement('div', { className: 'bg-red-500 h-full rounded-l', style: { width: `${(high/safeListLength)*100}%` } }),
+                React.createElement('div', { className: 'bg-yellow-500 h-full', style: { width: `${((list.length-high)/safeListLength)*100}%` } })
             )
         )
     );
@@ -408,6 +419,49 @@ const ProjectDetailsWidget = ({ details }) => {
     );
 };
 
+const TaskOverview = ({ schedule }) => {
+    if (!schedule) return React.createElement('div', { className: 'bg-dark-card-solid p-6 rounded-2xl border border-dark-border h-full flex items-center justify-center text-slate-500' }, "No schedule data");
+
+    const stats = schedule.reduce((acc, t) => {
+        if (t.type === 'task') {
+            acc.total++;
+            if (t.progress === 100) acc.done++;
+            else if (t.progress > 0) acc.progress++;
+            else acc.todo++;
+        }
+        return acc;
+    }, { total: 0, done: 0, progress: 0, todo: 0 });
+
+    const segments = [
+        { value: stats.done, color: '#2DD4BF', label: 'Done' },
+        { value: stats.progress, color: '#FACC15', label: 'In Progress' },
+        { value: stats.todo, color: '#334155', label: 'To Do' }
+    ];
+
+    return React.createElement('div', { className: 'bg-dark-card-solid print:bg-white p-6 rounded-2xl border border-dark-border print:border-gray-300 h-full flex flex-col' },
+        React.createElement('h3', { className: 'text-white print:text-black font-bold mb-6 flex items-center gap-2' }, 
+            React.createElement('span', { className: 'w-2 h-6 bg-brand-purple rounded-full' }),
+            "Task Velocity"
+        ),
+        React.createElement('div', { className: 'flex items-end gap-2 mb-2' },
+            React.createElement('span', { className: 'text-4xl font-bold text-white print:text-black' }, stats.total),
+            React.createElement('span', { className: 'text-brand-text-light print:text-gray-500 mb-1' }, "Total Tasks")
+        ),
+        React.createElement('div', { className: 'mb-6' },
+            React.createElement(StackedBar, { segments, height: 16 })
+        ),
+        React.createElement('div', { className: 'grid grid-cols-3 gap-2 mt-auto' },
+            segments.map((seg, i) => 
+                React.createElement('div', { key: i, className: 'text-center p-2 rounded-lg bg-dark-bg/50 print:bg-gray-100' },
+                    React.createElement('div', { className: 'w-2 h-2 rounded-full mx-auto mb-1', style: { backgroundColor: seg.color } }),
+                    React.createElement('span', { className: 'block text-lg font-bold text-white print:text-black' }, seg.value),
+                    React.createElement('span', { className: 'text-[10px] text-brand-text-light print:text-gray-600 uppercase' }, seg.label)
+                )
+            )
+        )
+    );
+};
+
 // --- Main Layout ---
 
 const ProjectOverview = ({ language, projectData }) => {
@@ -422,22 +476,22 @@ const ProjectOverview = ({ language, projectData }) => {
         setTimeout(() => setIsRefreshing(false), 1500);
     };
 
-    // Calculate derived metrics
-    const kpi = projectData?.kpiReport?.kpis || { spi: 1, cpi: 1 };
+    // Calculate derived metrics with safety checks
+    const kpi = projectData?.kpiReport?.kpis || { spi: 1, cpi: 1, overallProgress: 0 };
     const progress = kpi.overallProgress || (projectData?.schedule ? 
         Math.round(projectData.schedule.reduce((acc, t) => acc + (t.progress || 0), 0) / Math.max(projectData.schedule.length, 1)) : 0);
 
-    // Extract Milestones
-    const milestones = projectData?.schedule?.filter(t => t.type === 'milestone').map(m => ({
+    // Extract Milestones with safety checks
+    const milestones = projectData?.schedule ? projectData.schedule.filter(t => t.type === 'milestone').map(m => ({
         name: m.name,
         date: m.end || m.start,
         completed: m.progress === 100,
         description: m.description
-    })) || [];
+    })) : [];
 
     // Project Meta
     const projectMeta = {
-        description: projectData?.objective || projectData?.consultingPlan?.scopeAndObjectives,
+        description: projectData?.objective || projectData?.consultingPlan?.scopeAndObjectives || 'No description available.',
         location: projectData?.criteria?.location,
         startDate: projectData?.criteria?.startDate,
         finishDate: projectData?.criteria?.finishDate,
@@ -448,17 +502,17 @@ const ProjectOverview = ({ language, projectData }) => {
         // Flatten data for CSV
         const rows = [
             ['Metric', 'Value'],
-            ['Project Name', projectData.consultingPlan?.projectTitle || 'Untitled'],
+            ['Project Name', projectData?.consultingPlan?.projectTitle || 'Untitled'],
             ['Overall Progress', `${progress}%`],
             ['SPI (Schedule Performance)', kpi.spi],
             ['CPI (Cost Performance)', kpi.cpi],
-            ['Total Tasks', projectData.schedule?.length || 0],
-            ['Active Risks', projectData.risk?.risks?.length || 0],
-            ['Total Budget', projectData.criteria?.budget || 'N/A']
+            ['Total Tasks', projectData?.schedule?.length || 0],
+            ['Active Risks', projectData?.risk?.risks?.length || 0],
+            ['Total Budget', projectData?.criteria?.budget || 'N/A']
         ];
 
         // Add Risks if available
-        if (projectData.risk?.risks) {
+        if (projectData?.risk?.risks) {
             rows.push([]);
             rows.push(['RISK REGISTER', 'Severity', 'Likelihood', 'Impact']);
             projectData.risk.risks.forEach(r => {
@@ -527,7 +581,7 @@ const ProjectOverview = ({ language, projectData }) => {
             React.createElement('div', { className: 'max-w-7xl mx-auto' },
                 // Print Header
                 React.createElement('div', { className: 'hidden print:block mb-8 text-center border-b border-black pb-4' },
-                    React.createElement('h1', { className: 'text-3xl font-bold text-black' }, projectData.consultingPlan?.projectTitle || "Project Dashboard"),
+                    React.createElement('h1', { className: 'text-3xl font-bold text-black' }, projectData?.consultingPlan?.projectTitle || "Project Dashboard"),
                     React.createElement('p', { className: 'text-gray-600' }, `Executive Summary - Generated on ${new Date().toLocaleDateString()}`)
                 ),
 
