@@ -141,7 +141,7 @@ const DashboardWidget = ({ title, children, expandedContent, className = '', hea
 };
 
 
-// --- Specific Widgets --- (HealthCard, ResourceHeatmap, BudgetBurndown, etc. unchanged logic, simplified for brevity in rendering)
+// --- Specific Widgets --- 
 
 const HealthCard = ({ progress, spi, cpi }) => {
     const status = (spi || 1) >= 1 && (cpi || 1) >= 1 ? 'Healthy' : ((spi || 1) < 0.9 || (cpi || 1) < 0.9) ? 'Critical' : 'At Risk';
@@ -307,8 +307,7 @@ const BudgetBurndown = ({ budget, currency = 'USD', kpi }) => {
     );
 };
 
-const MilestonesWidget = ({ milestones, schedule }) => {
-    
+const MilestonesWidget = ({ milestones }) => {
     // Expanded view logic (unchanged)
     const ExpandedView = (
         React.createElement('div', { className: 'space-y-4' },
@@ -335,11 +334,19 @@ const MilestonesWidget = ({ milestones, schedule }) => {
         )
     );
 
-    return React.createElement(DashboardWidget, { title: "Project Timeline & Milestones", expandedContent: ExpandedView },
-        React.createElement('div', { className: 'h-full flex flex-col' },
-             schedule && schedule.length > 0 
-                ? React.createElement(MiniGantt, { tasks: schedule })
-                : React.createElement('div', { className: 'h-32 bg-dark-bg/50 rounded-lg flex items-center justify-center text-sm text-brand-text-light border border-dark-border border-dashed' }, "No timeline data available.")
+    // Mini View (Top 3 upcoming)
+    const upcoming = milestones ? milestones.filter(m => !m.completed).slice(0, 3) : [];
+
+    return React.createElement(DashboardWidget, { title: "Key Milestones", expandedContent: ExpandedView },
+        React.createElement('div', { className: 'space-y-3' },
+            upcoming.length > 0 ? upcoming.map((m, i) => (
+                React.createElement('div', { key: i, className: 'flex items-center gap-3 border-l-2 border-brand-purple pl-3' },
+                    React.createElement('div', { className: 'flex-grow' },
+                        React.createElement('p', { className: 'text-sm font-medium text-white truncate' }, m.name),
+                        React.createElement('p', { className: 'text-xs text-brand-text-light' }, m.date ? new Date(m.date).toLocaleDateString() : '')
+                    )
+                )
+            )) : React.createElement('p', { className: 'text-xs text-brand-text-light italic' }, "No upcoming milestones found.")
         )
     );
 };
