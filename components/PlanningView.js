@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { i18n } from '../constants.js';
 import { generateProjectPlan } from '../services/planningService.js';
-import { Spinner, UserIcon, HistoryIcon, PlusIcon, AttachIcon, FeatureToolbar } from './Shared.js';
+import { Spinner, UserIcon, HistoryIcon, PlusIcon, CloseIcon, FeatureToolbar, TrashIcon } from './Shared.js';
 
 
 const PlanIcon = ({ className = 'h-16 w-16 text-slate-500' }) => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className, viewBox: "0 0 64 64" },
@@ -14,6 +13,65 @@ const PlanIcon = ({ className = 'h-16 w-16 text-slate-500' }) => React.createEle
     React.createElement('rect', { x: '20', y: '38', width: '26', height: '3', rx: '1.5', fill: '#115E59' })
 );
 
+// --- Add Item Modal ---
+const AddItemModal = ({ isOpen, onClose, type, onAdd }) => {
+    const [formData, setFormData] = useState({ name: '', description: '', durationInDays: '', assigneeCount: '', acceptanceCriteria: '' });
+
+    useEffect(() => {
+        if (isOpen) setFormData({ name: '', description: '', durationInDays: '', assigneeCount: '', acceptanceCriteria: '' });
+    }, [isOpen]);
+
+    if (!isOpen) return null;
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        onAdd({
+            ...formData,
+            durationInDays: parseInt(formData.durationInDays) || 0,
+            assigneeCount: parseInt(formData.assigneeCount) || 1,
+            subtasks: [] // Default for WBS
+        });
+        onClose();
+    };
+
+    return React.createElement('div', { className: "fixed inset-0 bg-black/80 z-[200] flex justify-center items-center backdrop-blur-sm p-4 animate-fade-in-up" },
+        React.createElement('div', { className: "bg-dark-card rounded-xl shadow-2xl w-full max-w-md border border-dark-border glow-border p-6" },
+            React.createElement('div', { className: 'flex justify-between items-center mb-6' },
+                React.createElement('h3', { className: "text-xl font-bold text-white" }, `Add New ${type}`),
+                React.createElement('button', { onClick: onClose, className: "text-brand-text-light hover:text-white" }, React.createElement(CloseIcon, null))
+            ),
+            React.createElement('form', { onSubmit: handleSubmit, className: 'space-y-4' },
+                React.createElement('div', null,
+                    React.createElement('label', { className: "block text-sm font-medium text-brand-text-light mb-1" }, "Title/Name"),
+                    React.createElement('input', { required: true, value: formData.name, onChange: e => setFormData({...formData, name: e.target.value}), className: "w-full p-2 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none" })
+                ),
+                type === 'WBS Task' ? (
+                    React.createElement('div', null,
+                        React.createElement('label', { className: "block text-sm font-medium text-brand-text-light mb-1" }, "Description"),
+                        React.createElement('textarea', { required: true, rows: 2, value: formData.description, onChange: e => setFormData({...formData, description: e.target.value}), className: "w-full p-2 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none" })
+                    )
+                ) : (
+                    React.createElement('div', null,
+                        React.createElement('label', { className: "block text-sm font-medium text-brand-text-light mb-1" }, "Acceptance Criteria"),
+                        React.createElement('textarea', { required: true, rows: 2, value: formData.acceptanceCriteria, onChange: e => setFormData({...formData, acceptanceCriteria: e.target.value}), className: "w-full p-2 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none" })
+                    )
+                ),
+                React.createElement('div', { className: 'grid grid-cols-2 gap-4' },
+                    React.createElement('div', null,
+                        React.createElement('label', { className: "block text-sm font-medium text-brand-text-light mb-1" }, "Duration (Days)"),
+                        React.createElement('input', { type: "number", required: true, value: formData.durationInDays, onChange: e => setFormData({...formData, durationInDays: e.target.value}), className: "w-full p-2 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none" })
+                    ),
+                    React.createElement('div', null,
+                        React.createElement('label', { className: "block text-sm font-medium text-brand-text-light mb-1" }, "Assignees"),
+                        React.createElement('input', { type: "number", required: true, value: formData.assigneeCount, onChange: e => setFormData({...formData, assigneeCount: e.target.value}), className: "w-full p-2 bg-dark-bg border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-brand-purple focus:outline-none" })
+                    )
+                ),
+                React.createElement('button', { type: "submit", className: "w-full py-2 bg-button-gradient text-white font-bold rounded-lg mt-2" }, "Add Item")
+            )
+        )
+    );
+};
+
 const LoadingView = ({ progress }) => (
     React.createElement('div', { className: 'text-center flex flex-col items-center' },
         React.createElement(PlanIcon, { className: 'h-12 w-12 text-slate-500' }),
@@ -23,16 +81,74 @@ const LoadingView = ({ progress }) => (
     )
 );
 
-const ResultsView = ({ plan }) => {
-    const renderCardFooter = (item) => React.createElement('div', { className: 'flex items-center justify-between text-brand-text-light mt-4 pt-4 border-t border-dark-border print:border-gray-300' },
+// --- Editable Results View ---
+const ResultsView = ({ plan, isEditing, onUpdatePlan, onOpenAddModal }) => {
+    
+    // Helper to update a specific WBS item
+    const updateWbsItem = (index, field, value) => {
+        const newWbs = [...plan.workBreakdownStructure];
+        newWbs[index] = { ...newWbs[index], [field]: value };
+        onUpdatePlan({ ...plan, workBreakdownStructure: newWbs });
+    };
+
+    // Helper to update subtask
+    const updateSubtask = (taskIndex, subIndex, value) => {
+        const newWbs = [...plan.workBreakdownStructure];
+        newWbs[taskIndex].subtasks[subIndex].name = value;
+        onUpdatePlan({ ...plan, workBreakdownStructure: newWbs });
+    };
+
+    // Helper to add subtask
+    const addSubtask = (taskIndex) => {
+        const newWbs = [...plan.workBreakdownStructure];
+        newWbs[taskIndex].subtasks.push({ name: "New Subtask", durationInDays: 1 });
+        onUpdatePlan({ ...plan, workBreakdownStructure: newWbs });
+    };
+
+    // Helper to delete WBS item
+    const deleteWbsItem = (index) => {
+        const newWbs = plan.workBreakdownStructure.filter((_, i) => i !== index);
+        onUpdatePlan({ ...plan, workBreakdownStructure: newWbs });
+    };
+
+    // Helper to update Milestone
+    const updateMilestone = (index, field, value) => {
+        const newMs = [...plan.keyMilestones];
+        newMs[index] = { ...newMs[index], [field]: value };
+        onUpdatePlan({ ...plan, keyMilestones: newMs });
+    };
+
+    const deleteMilestone = (index) => {
+        const newMs = plan.keyMilestones.filter((_, i) => i !== index);
+        onUpdatePlan({ ...plan, keyMilestones: newMs });
+    };
+
+    const renderCardFooter = (item, type, index) => React.createElement('div', { className: 'flex items-center justify-between text-brand-text-light mt-4 pt-4 border-t border-dark-border print:border-gray-300' },
         React.createElement('div', { className: 'flex items-center gap-4 text-sm' },
             React.createElement('div', { className: 'flex items-center gap-1.5', title: 'Assignees' },
                 React.createElement(UserIcon, { className: 'h-4 w-4' }),
-                React.createElement('span', null, item.assigneeCount || 1)
+                isEditing ? (
+                    React.createElement('input', {
+                        type: "number",
+                        value: item.assigneeCount,
+                        onChange: (e) => type === 'wbs' ? updateWbsItem(index, 'assigneeCount', parseInt(e.target.value)) : updateMilestone(index, 'assigneeCount', parseInt(e.target.value)),
+                        className: "bg-dark-bg border border-dark-border rounded w-16 px-1 text-white"
+                    })
+                ) : React.createElement('span', null, item.assigneeCount || 1)
             ),
             React.createElement('div', { className: 'flex items-center gap-1.5', title: 'Duration' },
                 React.createElement(HistoryIcon, { className: 'h-4 w-4' }),
-                React.createElement('span', null, `${item.durationInDays || 1} day${item.durationInDays !== 1 ? 's' : ''}`)
+                isEditing ? (
+                    React.createElement('div', { className: 'flex items-center gap-1' },
+                        React.createElement('input', {
+                            type: "number",
+                            value: item.durationInDays,
+                            onChange: (e) => type === 'wbs' ? updateWbsItem(index, 'durationInDays', parseInt(e.target.value)) : updateMilestone(index, 'durationInDays', parseInt(e.target.value)),
+                            className: "bg-dark-bg border border-dark-border rounded w-16 px-1 text-white"
+                        }),
+                        React.createElement('span', null, "days")
+                    )
+                ) : React.createElement('span', null, `${item.durationInDays || 1} day${item.durationInDays !== 1 ? 's' : ''}`)
             )
         )
     );
@@ -41,34 +157,96 @@ const ResultsView = ({ plan }) => {
         React.createElement('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-6 print:block' },
             // Work Breakdown Structure Column
             React.createElement('div', { className: 'print:mb-8' },
-                React.createElement('h3', { className: 'text-xl font-semibold mb-4 flex items-center justify-between text-white print:text-black' },
-                    "Work Breakdown Structure",
-                    React.createElement('button', { className: 'p-2 rounded-full bg-dark-card-solid hover:bg-white/10 print:hidden' }, React.createElement(PlusIcon, { className: 'h-4 w-4' }))
+                React.createElement('div', { className: 'flex items-center justify-between mb-4' },
+                    React.createElement('h3', { className: 'text-xl font-semibold text-white print:text-black' }, "Work Breakdown Structure"),
+                    React.createElement('button', {
+                        onClick: () => onOpenAddModal('WBS Task'),
+                        className: 'p-2 rounded-full bg-dark-card-solid hover:bg-white/10 print:hidden text-brand-purple-light transition-colors',
+                        title: "Add Phase/Task"
+                    }, React.createElement(PlusIcon, { className: 'h-5 w-5' }))
                 ),
                 React.createElement('div', { className: 'space-y-4' }, plan.workBreakdownStructure?.map((task, index) =>
-                    React.createElement('div', { key: index, className: 'bg-dark-card-solid border border-dark-border rounded-lg p-4 break-inside-avoid print:bg-white print:border-gray-300 print:text-black print:shadow-none' },
-                        React.createElement('h4', { className: 'font-bold text-white print:text-black' }, task.name),
-                        React.createElement('p', { className: 'text-sm text-brand-text-light mt-1 print:text-gray-700' }, task.description),
-                        task.subtasks && task.subtasks.length > 0 && (
-                             React.createElement('div', { className: 'mt-3 space-y-2 text-sm' }, task.subtasks.map((sub, sIndex) =>
-                                React.createElement('div', { key: sIndex, className: 'pl-4 border-l-2 border-dark-border print:border-gray-300' }, sub.name)
-                             ))
+                    React.createElement('div', { key: index, className: 'bg-dark-card-solid border border-dark-border rounded-lg p-4 break-inside-avoid print:bg-white print:border-gray-300 print:text-black print:shadow-none group relative' },
+                        isEditing && React.createElement('button', {
+                            onClick: () => deleteWbsItem(index),
+                            className: "absolute top-2 right-2 p-1 text-red-400 hover:bg-red-500/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        }, React.createElement(TrashIcon, null)),
+                        
+                        isEditing ? (
+                            React.createElement('input', {
+                                value: task.name,
+                                onChange: (e) => updateWbsItem(index, 'name', e.target.value),
+                                className: "font-bold text-white bg-dark-bg border border-dark-border rounded w-full px-2 py-1 mb-2"
+                            })
+                        ) : React.createElement('h4', { className: 'font-bold text-white print:text-black' }, task.name),
+                        
+                        isEditing ? (
+                            React.createElement('textarea', {
+                                value: task.description,
+                                onChange: (e) => updateWbsItem(index, 'description', e.target.value),
+                                rows: 2,
+                                className: "text-sm text-brand-text-light bg-dark-bg border border-dark-border rounded w-full px-2 py-1"
+                            })
+                        ) : React.createElement('p', { className: 'text-sm text-brand-text-light mt-1 print:text-gray-700' }, task.description),
+                        
+                        (task.subtasks && task.subtasks.length > 0 || isEditing) && (
+                             React.createElement('div', { className: 'mt-3 space-y-2 text-sm' }, 
+                                task.subtasks?.map((sub, sIndex) =>
+                                    React.createElement('div', { key: sIndex, className: 'pl-4 border-l-2 border-dark-border print:border-gray-300 flex items-center' },
+                                        isEditing ? (
+                                            React.createElement('input', {
+                                                value: sub.name,
+                                                onChange: (e) => updateSubtask(index, sIndex, e.target.value),
+                                                className: "w-full bg-dark-bg border border-dark-border rounded px-2 py-0.5 text-white"
+                                            })
+                                        ) : sub.name
+                                    )
+                                ),
+                                isEditing && React.createElement('button', {
+                                    onClick: () => addSubtask(index),
+                                    className: "text-xs text-brand-purple-light hover:text-white mt-1 pl-4 flex items-center gap-1"
+                                }, "+ Add Subtask")
+                             )
                         ),
-                        renderCardFooter(task)
+                        renderCardFooter(task, 'wbs', index)
                     ))
                 )
             ),
             // Key Milestones Column
             React.createElement('div', null,
-                React.createElement('h3', { className: 'text-xl font-semibold mb-4 flex items-center justify-between text-white print:text-black' },
-                    "Key Milestones",
-                    React.createElement('button', { className: 'p-2 rounded-full bg-dark-card-solid hover:bg-white/10 print:hidden' }, React.createElement(PlusIcon, { className: 'h-4 w-4' }))
+                React.createElement('div', { className: 'flex items-center justify-between mb-4' },
+                    React.createElement('h3', { className: 'text-xl font-semibold text-white print:text-black' }, "Key Milestones"),
+                    React.createElement('button', {
+                        onClick: () => onOpenAddModal('Milestone'),
+                        className: 'p-2 rounded-full bg-dark-card-solid hover:bg-white/10 print:hidden text-brand-purple-light transition-colors',
+                        title: "Add Milestone"
+                    }, React.createElement(PlusIcon, { className: 'h-5 w-5' }))
                 ),
                 React.createElement('div', { className: 'space-y-4' }, plan.keyMilestones?.map((milestone, index) =>
-                    React.createElement('div', { key: index, className: 'bg-dark-card-solid border border-dark-border rounded-lg p-4 break-inside-avoid print:bg-white print:border-gray-300 print:text-black print:shadow-none' },
-                        React.createElement('h4', { className: 'font-bold text-white print:text-black' }, milestone.name),
-                        React.createElement('p', { className: 'text-sm text-brand-text-light mt-1 print:text-gray-700' }, milestone.acceptanceCriteria),
-                        renderCardFooter(milestone)
+                    React.createElement('div', { key: index, className: 'bg-dark-card-solid border border-dark-border rounded-lg p-4 break-inside-avoid print:bg-white print:border-gray-300 print:text-black print:shadow-none group relative' },
+                        isEditing && React.createElement('button', {
+                            onClick: () => deleteMilestone(index),
+                            className: "absolute top-2 right-2 p-1 text-red-400 hover:bg-red-500/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        }, React.createElement(TrashIcon, null)),
+
+                        isEditing ? (
+                            React.createElement('input', {
+                                value: milestone.name,
+                                onChange: (e) => updateMilestone(index, 'name', e.target.value),
+                                className: "font-bold text-white bg-dark-bg border border-dark-border rounded w-full px-2 py-1 mb-2"
+                            })
+                        ) : React.createElement('h4', { className: 'font-bold text-white print:text-black' }, milestone.name),
+                        
+                        isEditing ? (
+                            React.createElement('textarea', {
+                                value: milestone.acceptanceCriteria,
+                                onChange: (e) => updateMilestone(index, 'acceptanceCriteria', e.target.value),
+                                rows: 2,
+                                className: "text-sm text-brand-text-light bg-dark-bg border border-dark-border rounded w-full px-2 py-1"
+                            })
+                        ) : React.createElement('p', { className: 'text-sm text-brand-text-light mt-1 print:text-gray-700' }, milestone.acceptanceCriteria),
+                        
+                        renderCardFooter(milestone, 'ms', index)
                     ))
                 )
             )
@@ -153,13 +331,30 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
     const fullscreenRef = useRef(null);
     const contentRef = useRef(null);
 
+    // Local state for editing
+    const [localPlan, setLocalPlan] = useState(null);
+    const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'WBS Task' });
+
+    // Sync prop plan to local state when it loads
+    useEffect(() => {
+        if (projectData.plan) {
+            setLocalPlan(projectData.plan);
+        }
+    }, [projectData.plan]);
+
     // Toolbar State
     const [zoomLevel, setZoomLevel] = useState(1);
     const [isEditing, setIsEditing] = useState(false);
 
     const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 1.5));
     const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.7));
-    const handleToggleEdit = () => setIsEditing(prev => !prev);
+    const handleToggleEdit = () => {
+        // When toggling off edit mode, save changes to parent
+        if (isEditing && localPlan) {
+            onUpdateProject({ plan: localPlan });
+        }
+        setIsEditing(prev => !prev);
+    };
     const handleExport = () => window.print();
 
     // Effect to auto-generate plan when objective is set (if coming from Consulting Plan)
@@ -182,7 +377,28 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
         }
     }, [projectData.objective, projectData.plan, projectData.criteria, isLoading, onUpdateProject, setIsLoading, setError]);
 
-    const hasPlan = !!projectData.plan;
+    const hasPlan = !!localPlan;
+
+    // Handle adding new items from Modal
+    const handleAddItem = (newItem) => {
+        if (!localPlan) return;
+        
+        const updatedPlan = { ...localPlan };
+        if (modalConfig.type === 'WBS Task') {
+            updatedPlan.workBreakdownStructure = [...(updatedPlan.workBreakdownStructure || []), newItem];
+        } else {
+            updatedPlan.keyMilestones = [...(updatedPlan.keyMilestones || []), newItem];
+        }
+        
+        setLocalPlan(updatedPlan);
+        onUpdateProject({ plan: updatedPlan }); // Auto-save on add
+    };
+
+    const handleUpdateLocalPlan = (newPlan) => {
+        setLocalPlan(newPlan);
+        // We don't auto-save on every keystroke in Edit Mode, only on toggle off or specific actions, 
+        // but for safety we can save debounced or on blur. Here we rely on toggle off or explicit actions.
+    };
 
     const renderContent = () => {
         if (!projectData.objective) {
@@ -196,11 +412,16 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
                 error
             });
         }
-        if (isLoading && !projectData.plan) {
+        if (isLoading && !hasPlan) {
             return React.createElement(LoadingView, null);
         }
-        if (projectData.plan) {
-            return React.createElement(ResultsView, { plan: projectData.plan });
+        if (hasPlan) {
+            return React.createElement(ResultsView, { 
+                plan: localPlan, 
+                isEditing: isEditing,
+                onUpdatePlan: handleUpdateLocalPlan,
+                onOpenAddModal: (type) => setModalConfig({ isOpen: true, type })
+            });
         }
         // Fallback for error state where objective exists but plan failed
         return React.createElement(InputView, {
@@ -228,14 +449,20 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
                ref: contentRef,
                className: 'p-6 printable-content w-full pb-32', 
                style: { transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.2s ease', width: '100%' },
-               contentEditable: isEditing,
+               contentEditable: false, // Managed inputs internally
                suppressContentEditableWarning: true
            },
                !hasPlan && !isLoading 
                 ? React.createElement('div', { className: 'h-full flex items-center justify-center'}, renderContent())
                 : renderContent()
            )
-       )
+       ),
+       React.createElement(AddItemModal, {
+           isOpen: modalConfig.isOpen,
+           onClose: () => setModalConfig({ ...modalConfig, isOpen: false }),
+           type: modalConfig.type,
+           onAdd: handleAddItem
+       })
     );
 };
 
