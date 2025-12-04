@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { FeatureToolbar, RefreshIcon, Spinner, ExportIcon, DocumentIcon } from './Shared.js';
+import { FeatureToolbar, RefreshIcon, Spinner, ExportIcon, DocumentIcon, ExpandIcon, CollapseIcon, CloseIcon } from './Shared.js';
 import { i18n } from '../constants.js';
 
 // --- Infographics Components ---
@@ -34,7 +34,7 @@ const RadialProgress = ({ progress, size = 80, strokeWidth = 8, color = '#2DD4BF
 
 const StackedBar = ({ segments, height = 12 }) => {
     const total = segments.reduce((acc, s) => acc + s.value, 0);
-    return React.createElement('div', { className: `w-full flex rounded-full overflow-hidden h-${height/4} bg-dark-bg print:bg-gray-200` }, // Tailwind height class hack or style
+    return React.createElement('div', { className: `w-full flex rounded-full overflow-hidden h-${height/4} bg-dark-bg print:bg-gray-200` },
         segments.map((seg, i) => {
             const width = total > 0 ? (seg.value / total) * 100 : 0;
             return React.createElement('div', {
@@ -46,134 +46,363 @@ const StackedBar = ({ segments, height = 12 }) => {
     );
 };
 
-// --- Widgets ---
+// --- Expandable Widget Wrapper ---
+const DashboardWidget = ({ title, children, expandedContent, className = '', headerAction }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
 
-const HealthCard = ({ progress, spi, cpi }) => {
-    const status = spi >= 1 && cpi >= 1 ? 'Healthy' : (spi < 0.9 || cpi < 0.9) ? 'Critical' : 'At Risk';
-    const statusColor = status === 'Healthy' ? 'text-green-400 print:text-green-700' : status === 'Critical' ? 'text-red-400 print:text-red-700' : 'text-yellow-400 print:text-yellow-700';
-    const statusBg = status === 'Healthy' ? 'bg-green-500/10 border-green-500/20 print:bg-green-50 print:border-green-200' : status === 'Critical' ? 'bg-red-500/10 border-red-500/20 print:bg-red-50 print:border-red-200' : 'bg-yellow-500/10 border-yellow-500/20 print:bg-yellow-50 print:border-yellow-200';
-
-    return React.createElement('div', { className: `p-6 rounded-2xl border ${statusBg} flex flex-col justify-between h-full` },
-        React.createElement('div', { className: 'flex justify-between items-start mb-4' },
-            React.createElement('div', null,
-                React.createElement('h3', { className: 'text-brand-text-light print:text-gray-600 text-sm uppercase tracking-wider font-semibold' }, "Project Health"),
-                React.createElement('p', { className: `text-2xl font-bold mt-1 ${statusColor}` }, status)
+    return React.createElement(React.Fragment, null,
+        // Collapsed / Standard View
+        React.createElement('div', { className: `bg-dark-card-solid print:bg-white border border-dark-border print:border-gray-300 rounded-2xl p-5 flex flex-col relative transition-all hover:border-brand-purple/30 ${className}` },
+            React.createElement('div', { className: 'flex justify-between items-center mb-4' },
+                React.createElement('h3', { className: 'text-white print:text-black font-bold text-sm uppercase tracking-wide' }, title),
+                React.createElement('div', { className: 'flex items-center gap-2' },
+                    headerAction,
+                    expandedContent && React.createElement('button', {
+                        onClick: () => setIsExpanded(true),
+                        className: 'p-1.5 rounded-full hover:bg-white/10 text-brand-text-light print:text-gray-500 hover:text-white transition-colors',
+                        title: "Expand details"
+                    }, React.createElement(ExpandIcon, { className: "w-4 h-4" }))
+                )
             ),
-            React.createElement(RadialProgress, { progress: progress || 0, color: status === 'Healthy' ? '#4ADE80' : status === 'Critical' ? '#F87171' : '#FACC15' })
+            React.createElement('div', { className: 'flex-grow min-h-0' }, children)
         ),
-        React.createElement('div', { className: 'grid grid-cols-2 gap-4 mt-auto' },
-            React.createElement('div', { className: 'bg-dark-bg/50 print:bg-white rounded-lg p-3 print:border print:border-gray-200' },
-                React.createElement('span', { className: 'text-xs text-brand-text-light print:text-gray-500 block' }, "Schedule Perf."),
-                React.createElement('span', { className: `text-lg font-bold ${spi >= 1 ? 'text-green-400 print:text-green-700' : 'text-red-400 print:text-red-700'}` }, spi)
-            ),
-            React.createElement('div', { className: 'bg-dark-bg/50 print:bg-white rounded-lg p-3 print:border print:border-gray-200' },
-                React.createElement('span', { className: 'text-xs text-brand-text-light print:text-gray-500 block' }, "Cost Perf."),
-                React.createElement('span', { className: `text-lg font-bold ${cpi >= 1 ? 'text-green-400 print:text-green-700' : 'text-red-400 print:text-red-700'}` }, cpi)
-            )
-        )
-    );
-};
 
-const TaskOverview = ({ schedule }) => {
-    if (!schedule) return React.createElement('div', { className: 'bg-dark-card-solid p-6 rounded-2xl border border-dark-border h-full flex items-center justify-center text-slate-500' }, "No schedule data");
-
-    const stats = schedule.reduce((acc, t) => {
-        if (t.type === 'task') {
-            acc.total++;
-            if (t.progress === 100) acc.done++;
-            else if (t.progress > 0) acc.progress++;
-            else acc.todo++;
-        }
-        return acc;
-    }, { total: 0, done: 0, progress: 0, todo: 0 });
-
-    const segments = [
-        { value: stats.done, color: '#2DD4BF', label: 'Done' },
-        { value: stats.progress, color: '#FACC15', label: 'In Progress' },
-        { value: stats.todo, color: '#334155', label: 'To Do' }
-    ];
-
-    return React.createElement('div', { className: 'bg-dark-card-solid print:bg-white p-6 rounded-2xl border border-dark-border print:border-gray-300 h-full flex flex-col' },
-        React.createElement('h3', { className: 'text-white print:text-black font-bold mb-6 flex items-center gap-2' }, 
-            React.createElement('span', { className: 'w-2 h-6 bg-brand-purple rounded-full' }),
-            "Task Velocity"
-        ),
-        React.createElement('div', { className: 'flex items-end gap-2 mb-2' },
-            React.createElement('span', { className: 'text-4xl font-bold text-white print:text-black' }, stats.total),
-            React.createElement('span', { className: 'text-brand-text-light print:text-gray-500 mb-1' }, "Total Tasks")
-        ),
-        React.createElement('div', { className: 'mb-6' },
-            React.createElement(StackedBar, { segments, height: 16 })
-        ),
-        React.createElement('div', { className: 'grid grid-cols-3 gap-2 mt-auto' },
-            segments.map((seg, i) => 
-                React.createElement('div', { key: i, className: 'text-center p-2 rounded-lg bg-dark-bg/50 print:bg-gray-100' },
-                    React.createElement('div', { className: 'w-2 h-2 rounded-full mx-auto mb-1', style: { backgroundColor: seg.color } }),
-                    React.createElement('span', { className: 'block text-lg font-bold text-white print:text-black' }, seg.value),
-                    React.createElement('span', { className: 'text-[10px] text-brand-text-light print:text-gray-600 uppercase' }, seg.label)
+        // Expanded Modal View
+        isExpanded && React.createElement('div', {
+            className: 'fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex justify-center items-center p-6 animate-fade-in-up',
+            onClick: () => setIsExpanded(false)
+        },
+            React.createElement('div', {
+                className: 'bg-dark-card w-full max-w-5xl h-[85vh] rounded-2xl border border-dark-border shadow-2xl flex flex-col overflow-hidden',
+                onClick: e => e.stopPropagation()
+            },
+                React.createElement('div', { className: 'flex justify-between items-center p-6 border-b border-dark-border bg-dark-card-solid' },
+                    React.createElement('h2', { className: 'text-2xl font-bold text-white' }, title),
+                    React.createElement('button', {
+                        onClick: () => setIsExpanded(false),
+                        className: 'p-2 rounded-full hover:bg-white/10 text-brand-text-light hover:text-white'
+                    }, React.createElement(CloseIcon, { className: "w-6 h-6" }))
+                ),
+                React.createElement('div', { className: 'flex-grow p-8 overflow-y-auto' },
+                    expandedContent
                 )
             )
         )
     );
 };
 
-const FinancialsWidget = ({ budget, currency }) => {
-    if (!budget?.budgetItems) return React.createElement('div', { className: 'bg-dark-card-solid p-6 rounded-2xl border border-dark-border h-full flex items-center justify-center text-slate-500' }, "No budget data");
 
-    const labor = budget.budgetItems.reduce((acc, item) => acc + item.laborCost, 0);
-    const material = budget.budgetItems.reduce((acc, item) => acc + item.materialsCost, 0);
-    const contingency = budget.budgetItems.reduce((acc, item) => acc + ((item.laborCost + item.materialsCost) * (item.contingencyPercent / 100)), 0);
-    const total = labor + material + contingency;
+// --- Specific Widgets ---
 
-    const format = (v) => new Intl.NumberFormat('en-US', { style: 'currency', currency, notation: "compact" }).format(v);
+const HealthCard = ({ progress, spi, cpi }) => {
+    const status = spi >= 1 && cpi >= 1 ? 'Healthy' : (spi < 0.9 || cpi < 0.9) ? 'Critical' : 'At Risk';
+    const statusColor = status === 'Healthy' ? 'text-green-400 print:text-green-700' : status === 'Critical' ? 'text-red-400 print:text-red-700' : 'text-yellow-400 print:text-yellow-700';
+    
+    return React.createElement(DashboardWidget, { title: "Project Health" },
+        React.createElement('div', { className: 'flex justify-between items-center h-full' },
+            React.createElement('div', null,
+                React.createElement('p', { className: `text-3xl font-bold ${statusColor}` }, status),
+                React.createElement('p', { className: 'text-sm text-brand-text-light mt-1' }, `${progress}% Complete`)
+            ),
+            React.createElement(RadialProgress, { progress: progress || 0, color: status === 'Healthy' ? '#4ADE80' : status === 'Critical' ? '#F87171' : '#FACC15', size: 70 })
+        ),
+        React.createElement('div', { className: 'grid grid-cols-2 gap-2 mt-4' },
+            React.createElement('div', { className: 'bg-dark-bg/50 p-2 rounded text-center' },
+                React.createElement('span', { className: 'block text-xs text-brand-text-light' }, "SPI"),
+                React.createElement('span', { className: `font-bold ${spi >= 1 ? 'text-green-400' : 'text-red-400'}` }, spi)
+            ),
+            React.createElement('div', { className: 'bg-dark-bg/50 p-2 rounded text-center' },
+                React.createElement('span', { className: 'block text-xs text-brand-text-light' }, "CPI"),
+                React.createElement('span', { className: `font-bold ${cpi >= 1 ? 'text-green-400' : 'text-red-400'}` }, cpi)
+            )
+        )
+    );
+};
 
-    return React.createElement('div', { className: 'bg-gradient-to-br from-dark-card-solid to-[#0f1f1a] print:bg-white print:bg-none p-6 rounded-2xl border border-brand-purple/20 print:border-gray-300 h-full' },
-        React.createElement('h3', { className: 'text-white print:text-black font-bold mb-1' }, "Financial Overview"),
-        React.createElement('p', { className: 'text-brand-purple-light print:text-green-700 text-2xl font-bold mb-6' }, format(total)),
-        
-        React.createElement('div', { className: 'space-y-4' },
-            [{ l: 'Labor', v: labor, c: '#F472B6' }, { l: 'Material', v: material, c: '#2DD4BF' }, { l: 'Contingency', v: contingency, c: '#A3E635' }].map((item, i) => 
-                React.createElement('div', { key: i },
-                    React.createElement('div', { className: 'flex justify-between text-xs mb-1' },
-                        React.createElement('span', { className: 'text-brand-text-light print:text-gray-600' }, item.l),
-                        React.createElement('span', { className: 'text-white print:text-black font-medium' }, format(item.v))
-                    ),
-                    React.createElement('div', { className: 'w-full bg-black/30 print:bg-gray-200 rounded-full h-1.5' },
-                        React.createElement('div', { className: 'h-1.5 rounded-full', style: { width: `${(item.v / total) * 100}%`, backgroundColor: item.c } })
+const ResourceHeatmap = ({ schedule }) => {
+    // Determine utilization
+    const utilization = useMemo(() => {
+        if (!schedule) return {};
+        const map = {};
+        schedule.filter(t => t.type === 'task').forEach(t => {
+            const res = t.resource || 'Unassigned';
+            if (!map[res]) map[res] = { count: 0, pending: 0 };
+            map[res].count++;
+            if (t.progress < 100) map[res].pending++;
+        });
+        return map;
+    }, [schedule]);
+
+    const resources = Object.entries(utilization).sort((a, b) => b[1].pending - a[1].pending).slice(0, 5); // Top 5 busy
+
+    const ExpandedView = (
+        React.createElement('div', { className: 'space-y-6' },
+            React.createElement('p', { className: 'text-brand-text-light' }, "Detailed breakdown of resource allocation across all tasks."),
+            React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' },
+                Object.entries(utilization).map(([name, stats]) => 
+                    React.createElement('div', { key: name, className: 'bg-dark-bg p-4 rounded-lg border border-dark-border' },
+                        React.createElement('h4', { className: 'font-bold text-white mb-2' }, name),
+                        React.createElement('div', { className: 'flex justify-between text-sm mb-2' },
+                            React.createElement('span', { className: 'text-brand-text-light' }, "Total Tasks"),
+                            React.createElement('span', { className: 'text-white' }, stats.count)
+                        ),
+                        React.createElement('div', { className: 'flex justify-between text-sm mb-2' },
+                            React.createElement('span', { className: 'text-brand-text-light' }, "Pending"),
+                            React.createElement('span', { className: 'text-yellow-400' }, stats.pending)
+                        ),
+                        React.createElement('div', { className: 'w-full bg-slate-700 h-2 rounded-full overflow-hidden' },
+                            React.createElement('div', { 
+                                className: 'h-full bg-brand-purple', 
+                                style: { width: `${(stats.count > 0 ? (stats.count - stats.pending)/stats.count : 0) * 100}%` } 
+                            })
+                        )
                     )
                 )
             )
         )
     );
+
+    return React.createElement(DashboardWidget, { 
+        title: "Resource Load", 
+        expandedContent: ExpandedView
+    },
+        resources.length > 0 ? (
+            React.createElement('div', { className: 'space-y-3' },
+                resources.map(([name, stats], i) => (
+                    React.createElement('div', { key: i, className: 'flex items-center justify-between text-sm' },
+                        React.createElement('div', { className: 'flex items-center gap-2 truncate' },
+                            React.createElement('div', { className: `w-2 h-2 rounded-full ${stats.pending > 3 ? 'bg-red-400' : 'bg-green-400'}` }),
+                            React.createElement('span', { className: 'text-brand-text-light truncate max-w-[120px]' }, name)
+                        ),
+                        React.createElement('span', { className: 'font-mono text-white text-xs bg-dark-bg px-1.5 py-0.5 rounded' }, `${stats.pending} active`)
+                    )
+                ))
+            )
+        ) : React.createElement('p', { className: 'text-xs text-brand-text-light' }, "No resource data available")
+    );
 };
 
-const RiskMatrixWidget = ({ risks }) => {
+const BudgetBurndown = ({ budget, currency, kpi }) => {
+    // Mock burndown data calculation based on KPI
+    const totalBudget = kpi?.budgetAtCompletion || 0;
+    const earnedValue = totalBudget * ((kpi?.overallProgress || 0) / 100);
+    const actualCost = earnedValue / (kpi?.cpi || 1);
+    
+    const format = (v) => new Intl.NumberFormat('en-US', { style: 'currency', currency, notation: "compact" }).format(v);
+
+    const ExpandedView = (
+        React.createElement('div', null,
+            React.createElement('div', { className: 'grid grid-cols-3 gap-6 mb-8' },
+                React.createElement('div', { className: 'bg-dark-bg p-4 rounded-xl text-center' },
+                    React.createElement('p', { className: 'text-brand-text-light text-sm' }, "Planned Budget"),
+                    React.createElement('p', { className: 'text-2xl font-bold text-white' }, format(totalBudget))
+                ),
+                React.createElement('div', { className: 'bg-dark-bg p-4 rounded-xl text-center' },
+                    React.createElement('p', { className: 'text-brand-text-light text-sm' }, "Actual Spend"),
+                    React.createElement('p', { className: `text-2xl font-bold ${actualCost > earnedValue ? 'text-red-400' : 'text-green-400'}` }, format(actualCost))
+                ),
+                React.createElement('div', { className: 'bg-dark-bg p-4 rounded-xl text-center' },
+                    React.createElement('p', { className: 'text-brand-text-light text-sm' }, "Remaining"),
+                    React.createElement('p', { className: 'text-2xl font-bold text-brand-purple-light' }, format(totalBudget - actualCost))
+                )
+            ),
+            React.createElement('h4', { className: 'text-lg font-bold text-white mb-4' }, "Cost Breakdown"),
+            // Use FinancialWidget-style breakdown here for detail
+            budget?.budgetItems && (
+                React.createElement('table', { className: 'w-full text-left text-sm' },
+                    React.createElement('thead', { className: 'bg-dark-bg text-brand-text-light' },
+                        React.createElement('tr', null,
+                            React.createElement('th', { className: 'p-3' }, "Category"),
+                            React.createElement('th', { className: 'p-3' }, "Estimated Cost"),
+                            React.createElement('th', { className: 'p-3' }, "% of Total")
+                        )
+                    ),
+                    React.createElement('tbody', { className: 'divide-y divide-dark-border' },
+                        budget.budgetItems.map((item, i) => {
+                            const cost = item.laborCost + item.materialsCost;
+                            return React.createElement('tr', { key: i },
+                                React.createElement('td', { className: 'p-3 text-white' }, item.category),
+                                React.createElement('td', { className: 'p-3 text-brand-text-light' }, format(cost)),
+                                React.createElement('td', { className: 'p-3 text-brand-text-light' }, `${Math.round((cost/totalBudget)*100)}%`)
+                            );
+                        })
+                    )
+                )
+            )
+        )
+    );
+
+    return React.createElement(DashboardWidget, { title: "Budget Burndown", expandedContent: ExpandedView },
+        React.createElement('div', { className: 'flex flex-col h-full justify-between' },
+            React.createElement('div', { className: 'text-center py-2' },
+                React.createElement('p', { className: 'text-xs text-brand-text-light mb-1' }, "Budget Utilized"),
+                React.createElement('p', { className: 'text-3xl font-bold text-white' }, `${Math.round((actualCost / totalBudget) * 100) || 0}%`)
+            ),
+            React.createElement('div', { className: 'w-full bg-slate-700 h-3 rounded-full overflow-hidden' },
+                React.createElement('div', { 
+                    className: `h-full ${actualCost > totalBudget ? 'bg-red-500' : 'bg-green-500'}`, 
+                    style: { width: `${Math.min((actualCost/totalBudget)*100, 100)}%` } 
+                })
+            ),
+            React.createElement('div', { className: 'flex justify-between text-xs text-brand-text-light mt-2' },
+                React.createElement('span', null, format(actualCost)),
+                React.createElement('span', null, format(totalBudget))
+            )
+        )
+    );
+};
+
+const MilestonesWidget = ({ milestones }) => {
+    // Milestones usually come from Plan or Schedule
+    // If not direct, we extract from schedule (type='milestone')
+    
+    const ExpandedView = (
+        React.createElement('div', { className: 'space-y-4' },
+            React.createElement('p', { className: 'text-brand-text-light' }, "Key project checkpoints and deliverables."),
+            milestones && milestones.length > 0 ? (
+                milestones.map((m, i) => (
+                    React.createElement('div', { key: i, className: 'flex gap-4 p-4 bg-dark-bg rounded-lg border border-dark-border' },
+                        React.createElement('div', { className: 'flex-shrink-0 w-12 text-center' },
+                            React.createElement('div', { className: 'text-xs text-brand-text-light uppercase' }, new Date(m.date).toLocaleString('default', { month: 'short' })),
+                            React.createElement('div', { className: 'text-xl font-bold text-white' }, new Date(m.date).getDate())
+                        ),
+                        React.createElement('div', { className: 'flex-grow' },
+                            React.createElement('h4', { className: 'font-bold text-white' }, m.name),
+                            React.createElement('p', { className: 'text-sm text-brand-text-light' }, m.description || "No description provided.")
+                        ),
+                        React.createElement('div', { className: 'flex-shrink-0 self-center' },
+                            m.completed 
+                                ? React.createElement('span', { className: 'px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-bold' }, "Completed")
+                                : React.createElement('span', { className: 'px-3 py-1 bg-slate-700 text-slate-300 rounded-full text-xs' }, "Pending")
+                        )
+                    )
+                ))
+            ) : React.createElement('p', { className: 'text-slate-500 italic' }, "No milestones defined.")
+        )
+    );
+
+    // Mini View (Top 3 upcoming)
+    const upcoming = milestones ? milestones.filter(m => !m.completed).slice(0, 3) : [];
+
+    return React.createElement(DashboardWidget, { title: "Key Milestones", expandedContent: ExpandedView },
+        React.createElement('div', { className: 'space-y-3' },
+            upcoming.length > 0 ? upcoming.map((m, i) => (
+                React.createElement('div', { key: i, className: 'flex items-center gap-3 border-l-2 border-brand-purple pl-3' },
+                    React.createElement('div', { className: 'flex-grow' },
+                        React.createElement('p', { className: 'text-sm font-medium text-white truncate' }, m.name),
+                        React.createElement('p', { className: 'text-xs text-brand-text-light' }, m.date)
+                    )
+                )
+            )) : React.createElement('p', { className: 'text-xs text-brand-text-light italic' }, "No upcoming milestones found.")
+        )
+    );
+};
+
+const RiskRadarWidget = ({ risks }) => {
     const list = risks?.risks || [];
     const high = list.filter(r => r.severity === 'High').length;
-    const medium = list.filter(r => r.severity === 'Medium').length;
     
-    return React.createElement('div', { className: 'bg-gradient-to-br from-dark-card-solid to-[#1f0f0f] print:bg-white print:bg-none p-6 rounded-2xl border border-red-500/20 print:border-gray-300 h-full flex flex-col' },
-        React.createElement('div', { className: 'flex justify-between items-center mb-4' },
-            React.createElement('h3', { className: 'text-white print:text-black font-bold' }, "Risk Monitor"),
-            React.createElement('span', { className: 'bg-red-500/20 text-red-400 px-2 py-1 rounded text-xs font-bold' }, `${list.length} Active`)
-        ),
-        React.createElement('div', { className: 'flex-grow flex items-center justify-center gap-6' },
-            // Mini Matrix Visual
-            React.createElement('div', { className: 'grid grid-cols-2 gap-1 w-24 h-24' },
-                React.createElement('div', { className: 'bg-red-500/80 rounded-sm flex items-center justify-center text-white font-bold text-lg' }, high),
-                React.createElement('div', { className: 'bg-yellow-500/80 rounded-sm flex items-center justify-center text-white font-bold text-lg' }, medium),
-                React.createElement('div', { className: 'bg-yellow-500/80 rounded-sm' }),
-                React.createElement('div', { className: 'bg-green-500/80 rounded-sm' })
-            ),
-            React.createElement('div', { className: 'space-y-2' },
-                React.createElement('div', { className: 'flex items-center gap-2' },
-                    React.createElement('div', { className: 'w-3 h-3 bg-red-500 rounded-full' }),
-                    React.createElement('span', { className: 'text-sm text-brand-text-light print:text-black' }, "Critical")
-                ),
-                React.createElement('div', { className: 'flex items-center gap-2' },
-                    React.createElement('div', { className: 'w-3 h-3 bg-yellow-500 rounded-full' }),
-                    React.createElement('span', { className: 'text-sm text-brand-text-light print:text-black' }, "Moderate")
+    // Calculate category distribution (Mocked categories based on standard types if not in data)
+    const categories = { 'Schedule': 0, 'Cost': 0, 'Scope': 0, 'Resource': 0 };
+    list.forEach(r => {
+        // Simple heuristic mapping based on keywords
+        const txt = (r.title + r.description).toLowerCase();
+        if (txt.includes('delay') || txt.includes('time')) categories['Schedule']++;
+        else if (txt.includes('budget') || txt.includes('cost')) categories['Cost']++;
+        else if (txt.includes('scope') || txt.includes('requirement')) categories['Scope']++;
+        else categories['Resource']++; // Default bucket
+    });
+
+    const ExpandedView = (
+        React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-8' },
+            React.createElement('div', null,
+                React.createElement('h4', { className: 'text-lg font-bold text-white mb-4' }, "Risk Distribution"),
+                React.createElement('div', { className: 'space-y-3' },
+                    Object.entries(categories).map(([cat, count]) => (
+                        React.createElement('div', { key: cat },
+                            React.createElement('div', { className: 'flex justify-between text-sm mb-1' },
+                                React.createElement('span', { className: 'text-brand-text-light' }, cat),
+                                React.createElement('span', { className: 'text-white font-bold' }, count)
+                            ),
+                            React.createElement('div', { className: 'w-full bg-dark-bg h-2 rounded-full overflow-hidden' },
+                                React.createElement('div', { 
+                                    className: 'h-full bg-red-500', 
+                                    style: { width: `${(count / Math.max(list.length, 1)) * 100}%` } 
+                                })
+                            )
+                        )
+                    ))
                 )
+            ),
+            React.createElement('div', null,
+                React.createElement('h4', { className: 'text-lg font-bold text-white mb-4' }, "Top Critical Risks"),
+                React.createElement('ul', { className: 'space-y-3' },
+                    list.filter(r => r.severity === 'High').slice(0, 5).map((r, i) => (
+                        React.createElement('li', { key: i, className: 'bg-red-500/10 p-3 rounded border border-red-500/20' },
+                            React.createElement('p', { className: 'text-red-200 font-semibold text-sm' }, r.title),
+                            React.createElement('p', { className: 'text-red-300/70 text-xs mt-1' }, `Impact: ${r.impact}`)
+                        )
+                    ))
+                )
+            )
+        )
+    );
+
+    return React.createElement(DashboardWidget, { title: "Risk Exposure", expandedContent: ExpandedView },
+        React.createElement('div', { className: 'flex flex-col items-center justify-center h-full gap-2' },
+            React.createElement('div', { className: 'text-center' },
+                React.createElement('span', { className: 'text-4xl font-bold text-red-500' }, high),
+                React.createElement('span', { className: 'block text-xs text-brand-text-light uppercase tracking-wide' }, "Critical Risks")
+            ),
+            React.createElement('div', { className: 'w-full flex gap-1 h-2 mt-2' },
+                React.createElement('div', { className: 'bg-red-500 h-full rounded-l', style: { width: `${(high/list.length)*100}%` } }),
+                React.createElement('div', { className: 'bg-yellow-500 h-full', style: { width: `${((list.length-high)/list.length)*100}%` } })
+            )
+        )
+    );
+};
+
+const ProjectDetailsWidget = ({ details }) => {
+    const ExpandedView = (
+        React.createElement('div', { className: 'space-y-6' },
+            React.createElement('div', null,
+                React.createElement('h4', { className: 'text-brand-purple-light font-bold mb-2' }, "Description"),
+                React.createElement('p', { className: 'text-white leading-relaxed' }, details.description)
+            ),
+            React.createElement('div', { className: 'grid grid-cols-2 gap-4' },
+                React.createElement('div', null,
+                    React.createElement('h4', { className: 'text-brand-text-light text-sm mb-1' }, "Start Date"),
+                    React.createElement('p', { className: 'text-white font-mono' }, details.startDate)
+                ),
+                React.createElement('div', null,
+                    React.createElement('h4', { className: 'text-brand-text-light text-sm mb-1' }, "Finish Date"),
+                    React.createElement('p', { className: 'text-white font-mono' }, details.finishDate)
+                ),
+                React.createElement('div', null,
+                    React.createElement('h4', { className: 'text-brand-text-light text-sm mb-1' }, "Location"),
+                    React.createElement('p', { className: 'text-white' }, details.location)
+                ),
+                React.createElement('div', null,
+                    React.createElement('h4', { className: 'text-brand-text-light text-sm mb-1' }, "Budget Type"),
+                    React.createElement('p', { className: 'text-white' }, details.budgetType)
+                )
+            )
+        )
+    );
+
+    return React.createElement(DashboardWidget, { title: "Project Details", expandedContent: ExpandedView },
+        React.createElement('div', { className: 'space-y-2 text-sm' },
+            React.createElement('div', { className: 'flex justify-between' },
+                React.createElement('span', { className: 'text-brand-text-light' }, "Start:"),
+                React.createElement('span', { className: 'text-white' }, details.startDate || '-')
+            ),
+            React.createElement('div', { className: 'flex justify-between' },
+                React.createElement('span', { className: 'text-brand-text-light' }, "Finish:"),
+                React.createElement('span', { className: 'text-white' }, details.finishDate || '-')
+            ),
+            React.createElement('div', { className: 'flex justify-between' },
+                React.createElement('span', { className: 'text-brand-text-light' }, "Loc:"),
+                React.createElement('span', { className: 'text-white truncate max-w-[100px]' }, details.location || '-')
             )
         )
     );
@@ -197,6 +426,23 @@ const ProjectOverview = ({ language, projectData }) => {
     const kpi = projectData?.kpiReport?.kpis || { spi: 1, cpi: 1 };
     const progress = kpi.overallProgress || (projectData?.schedule ? 
         Math.round(projectData.schedule.reduce((acc, t) => acc + (t.progress || 0), 0) / Math.max(projectData.schedule.length, 1)) : 0);
+
+    // Extract Milestones
+    const milestones = projectData?.schedule?.filter(t => t.type === 'milestone').map(m => ({
+        name: m.name,
+        date: m.end || m.start,
+        completed: m.progress === 100,
+        description: m.description
+    })) || [];
+
+    // Project Meta
+    const projectMeta = {
+        description: projectData?.objective || projectData?.consultingPlan?.scopeAndObjectives,
+        location: projectData?.criteria?.location,
+        startDate: projectData?.criteria?.startDate,
+        finishDate: projectData?.criteria?.finishDate,
+        budgetType: projectData?.criteria?.budgetType
+    };
 
     const handleExportCSV = () => {
         // Flatten data for CSV
@@ -285,44 +531,48 @@ const ProjectOverview = ({ language, projectData }) => {
                     React.createElement('p', { className: 'text-gray-600' }, `Executive Summary - Generated on ${new Date().toLocaleDateString()}`)
                 ),
 
-                // Bento Grid Layout
-                React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 auto-rows-[minmax(180px,auto)]' },
+                // Enhanced Bento Grid Layout
+                React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 auto-rows-[minmax(160px,auto)]' },
                     
-                    // 1. Health Card (Top Left)
-                    React.createElement('div', { className: 'lg:col-span-1 lg:row-span-1' },
+                    // Row 1: Core Metrics
+                    React.createElement('div', { className: 'md:col-span-1 lg:col-span-1' },
                         React.createElement(HealthCard, { progress, spi: kpi.spi, cpi: kpi.cpi })
                     ),
-
-                    // 2. Task Velocity (Wide Center)
-                    React.createElement('div', { className: 'lg:col-span-2 lg:row-span-1' },
+                    React.createElement('div', { className: 'md:col-span-2 lg:col-span-2' },
                         React.createElement(TaskOverview, { schedule: projectData?.schedule })
                     ),
-
-                    // 3. Quick Actions / Milestone (Right Column)
-                    React.createElement('div', { className: 'lg:col-span-1 lg:row-span-2 flex flex-col gap-6' },
-                        React.createElement(FinancialsWidget, { budget: projectData?.budget, currency }),
-                        React.createElement(RiskMatrixWidget, { risks: projectData?.risk })
+                    React.createElement('div', { className: 'md:col-span-1 lg:col-span-1' },
+                        React.createElement(ProjectDetailsWidget, { details: projectMeta })
                     ),
 
-                    // 4. Detailed Breakdown (Bottom Wide)
-                    React.createElement('div', { className: 'lg:col-span-3 lg:row-span-1 bg-dark-card-solid border border-dark-border print:bg-white print:border-gray-300 rounded-2xl p-6' },
-                        React.createElement('h3', { className: 'text-white print:text-black font-bold mb-4' }, "Upcoming Critical Path"),
-                        projectData?.schedule 
-                            ? React.createElement('div', { className: 'space-y-3' },
-                                projectData.schedule.filter(t => t.type === 'task' && t.progress < 100).slice(0, 3).map(task => 
-                                    React.createElement('div', { key: task.id, className: 'flex justify-between items-center p-3 bg-dark-bg/50 print:bg-gray-100 rounded-lg hover:bg-dark-bg transition-colors cursor-default' },
-                                        React.createElement('div', { className: 'flex items-center gap-3' },
-                                            React.createElement('div', { className: `w-2 h-2 rounded-full ${task.progress > 0 ? 'bg-yellow-400' : 'bg-slate-500'}` }),
-                                            React.createElement('span', { className: 'font-medium text-sm text-white print:text-black' }, task.name)
-                                        ),
-                                        React.createElement('div', { className: 'flex items-center gap-4 text-xs text-brand-text-light print:text-gray-600' },
-                                            React.createElement('span', null, task.end),
-                                            React.createElement('span', { className: 'font-mono bg-dark-card print:bg-gray-200 px-2 py-1 rounded' }, task.resource || 'Unassigned')
-                                        )
-                                    )
+                    // Row 2: Analytics
+                    React.createElement('div', { className: 'md:col-span-1 lg:col-span-1' },
+                        React.createElement(BudgetBurndown, { budget: projectData?.budget, currency, kpi })
+                    ),
+                    React.createElement('div', { className: 'md:col-span-1 lg:col-span-1' },
+                        React.createElement(RiskRadarWidget, { risks: projectData?.risk })
+                    ),
+                    React.createElement('div', { className: 'md:col-span-1 lg:col-span-2' },
+                        React.createElement(ResourceHeatmap, { schedule: projectData?.schedule })
+                    ),
+
+                    // Row 3: Timeline & Milestones
+                    React.createElement('div', { className: 'md:col-span-3 lg:col-span-4 bg-dark-card-solid border border-dark-border rounded-2xl p-6' },
+                        React.createElement('h3', { className: 'text-white font-bold mb-4 flex items-center gap-2' }, 
+                            React.createElement('span', { className: 'w-2 h-6 bg-brand-cyan rounded-full' }),
+                            "Project Timeline & Milestones"
+                        ),
+                        React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-6' },
+                            React.createElement('div', { className: 'md:col-span-2' },
+                                // Simplified Gantt Placeholder for Overview
+                                React.createElement('div', { className: 'h-32 bg-dark-bg/50 rounded-lg flex items-center justify-center text-sm text-brand-text-light border border-dark-border border-dashed' },
+                                    "Gantt Preview (Visit Scheduling tab for full details)"
                                 )
-                              )
-                            : React.createElement('p', { className: 'text-brand-text-light text-sm italic' }, "No active tasks found in schedule.")
+                            ),
+                            React.createElement('div', { className: 'md:col-span-1' },
+                                React.createElement(MilestonesWidget, { milestones })
+                            )
+                        )
                     )
                 )
             )
