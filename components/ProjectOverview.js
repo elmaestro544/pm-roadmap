@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef } from 'react';
-import { FeatureToolbar, RefreshIcon, Spinner, ExportIcon, DocumentIcon, MaximizeIcon, CloseIcon } from './Shared.js';
+import { FeatureToolbar, RefreshIcon, Spinner, ExportIcon, DocumentIcon, MaximizeIcon, CloseIcon, ExpandIcon } from './Shared.js';
 import { i18n } from '../constants.js';
 
 // --- Infographics Components ---
@@ -7,7 +7,8 @@ import { i18n } from '../constants.js';
 const RadialProgress = ({ progress, size = 80, strokeWidth = 8, color = '#2DD4BF' }) => {
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
-    const offset = circumference - (Math.min(Math.max(progress || 0, 0), 100) / 100) * circumference;
+    const safeProgress = Math.min(Math.max(progress || 0, 0), 100);
+    const offset = circumference - (safeProgress / 100) * circumference;
 
     return React.createElement('div', { className: 'relative flex items-center justify-center' },
         React.createElement('svg', { width: size, height: size, viewBox: `0 0 ${size} ${size}`, className: 'transform -rotate-90' },
@@ -28,7 +29,7 @@ const RadialProgress = ({ progress, size = 80, strokeWidth = 8, color = '#2DD4BF
                 style: { transition: 'stroke-dashoffset 1s ease-out' }
             })
         ),
-        React.createElement('span', { className: 'absolute text-sm font-bold text-white print:text-black' }, `${Math.round(progress || 0)}%`)
+        React.createElement('span', { className: 'absolute text-sm font-bold text-white print:text-black' }, `${Math.round(safeProgress)}%`)
     );
 };
 
@@ -51,7 +52,6 @@ const MiniGantt = ({ tasks }) => {
     if (!tasks || tasks.length === 0) return null;
 
     // Filter mainly high-level tasks/phases for the overview
-    // If we have 'project' type tasks (phases), use those. Otherwise take a slice of tasks.
     let displayTasks = tasks.filter(t => t.type === 'project');
     if (displayTasks.length === 0) displayTasks = tasks.slice(0, 5); // Fallback
     
@@ -59,8 +59,11 @@ const MiniGantt = ({ tasks }) => {
     displayTasks.sort((a, b) => new Date(a.start) - new Date(b.start));
 
     // Determine timeline bounds
-    const startDates = displayTasks.map(t => new Date(t.start).getTime());
-    const endDates = displayTasks.map(t => new Date(t.end).getTime());
+    const startDates = displayTasks.map(t => new Date(t.start).getTime()).filter(d => !isNaN(d));
+    const endDates = displayTasks.map(t => new Date(t.end).getTime()).filter(d => !isNaN(d));
+    
+    if (startDates.length === 0 || endDates.length === 0) return null;
+
     const minTime = Math.min(...startDates);
     const maxTime = Math.max(...endDates);
     const totalDuration = maxTime - minTime;
@@ -69,6 +72,9 @@ const MiniGantt = ({ tasks }) => {
         displayTasks.map(task => {
             const start = new Date(task.start).getTime();
             const end = new Date(task.end).getTime();
+            
+            if (isNaN(start) || isNaN(end)) return null;
+
             const left = totalDuration > 0 ? ((start - minTime) / totalDuration) * 100 : 0;
             const width = totalDuration > 0 ? ((end - start) / totalDuration) * 100 : 100;
             const isCompleted = task.progress === 100;
@@ -141,7 +147,7 @@ const DashboardWidget = ({ title, children, expandedContent, className = '', hea
 };
 
 
-// --- Specific Widgets --- 
+// --- Specific Widgets --- (HealthCard, ResourceHeatmap, BudgetBurndown, etc.)
 
 const HealthCard = ({ progress, spi, cpi }) => {
     const status = (spi || 1) >= 1 && (cpi || 1) >= 1 ? 'Healthy' : ((spi || 1) < 0.9 || (cpi || 1) < 0.9) ? 'Critical' : 'At Risk';
@@ -308,7 +314,7 @@ const BudgetBurndown = ({ budget, currency = 'USD', kpi }) => {
 };
 
 const MilestonesWidget = ({ milestones }) => {
-    // Expanded view logic (unchanged)
+    // Expanded view logic
     const ExpandedView = (
         React.createElement('div', { className: 'space-y-4' },
             React.createElement('p', { className: 'text-brand-text-light' }, "Key project checkpoints and deliverables."),
@@ -355,7 +361,6 @@ const RiskRadarWidget = ({ risks }) => {
     const list = risks?.risks || [];
     const high = list.filter(r => r.severity === 'High').length;
     
-    // Categories calculation logic (unchanged)
     const categories = { 'Schedule': 0, 'Cost': 0, 'Scope': 0, 'Resource': 0 };
     list.forEach(r => {
         const txt = (r.title + r.description).toLowerCase();
