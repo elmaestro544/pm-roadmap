@@ -107,8 +107,8 @@ const DashboardWidget = ({ title, children, expandedContent, className = '', hea
 
     return React.createElement(React.Fragment, null,
         // Collapsed / Standard View
-        React.createElement('div', { className: `bg-dark-card-solid print:bg-white border border-dark-border print:border-gray-300 rounded-2xl p-5 flex flex-col relative transition-all hover:border-brand-purple/30 ${className}` },
-            React.createElement('div', { className: 'flex justify-between items-center mb-4' },
+        React.createElement('div', { className: `bg-dark-card-solid print:bg-white border border-dark-border print:border-gray-300 rounded-2xl p-5 flex flex-col relative transition-all hover:border-brand-purple/30 h-full ${className}` },
+            React.createElement('div', { className: 'flex justify-between items-center mb-4 flex-shrink-0' },
                 React.createElement('h3', { className: 'text-white print:text-black font-bold text-sm uppercase tracking-wide' }, title),
                 React.createElement('div', { className: 'flex items-center gap-2' },
                     headerAction,
@@ -119,7 +119,7 @@ const DashboardWidget = ({ title, children, expandedContent, className = '', hea
                     }, React.createElement(MaximizeIcon, { className: "w-4 h-4" }))
                 )
             ),
-            React.createElement('div', { className: 'flex-grow min-h-0' }, children)
+            React.createElement('div', { className: 'flex-grow min-h-0 flex flex-col' }, children)
         ),
 
         // Expanded Modal View
@@ -147,28 +147,30 @@ const DashboardWidget = ({ title, children, expandedContent, className = '', hea
 };
 
 
-// --- Specific Widgets --- (HealthCard, ResourceHeatmap, BudgetBurndown, etc.)
+// --- Specific Widgets ---
 
 const HealthCard = ({ progress, spi, cpi }) => {
     const status = (spi || 1) >= 1 && (cpi || 1) >= 1 ? 'Healthy' : ((spi || 1) < 0.9 || (cpi || 1) < 0.9) ? 'Critical' : 'At Risk';
     const statusColor = status === 'Healthy' ? 'text-green-400 print:text-green-700' : status === 'Critical' ? 'text-red-400 print:text-red-700' : 'text-yellow-400 print:text-yellow-700';
     
     return React.createElement(DashboardWidget, { title: "Project Health" },
-        React.createElement('div', { className: 'flex justify-between items-center h-full' },
-            React.createElement('div', null,
-                React.createElement('p', { className: `text-3xl font-bold ${statusColor}` }, status),
-                React.createElement('p', { className: 'text-sm text-brand-text-light mt-1' }, `${Math.round(progress || 0)}% Complete`)
+        React.createElement('div', { className: 'flex flex-col justify-between h-full' },
+             React.createElement('div', { className: 'flex justify-between items-center flex-grow' },
+                React.createElement('div', null,
+                    React.createElement('p', { className: `text-3xl font-bold ${statusColor}` }, status),
+                    React.createElement('p', { className: 'text-sm text-brand-text-light mt-1' }, `${Math.round(progress || 0)}% Complete`)
+                ),
+                React.createElement(RadialProgress, { progress: progress || 0, color: status === 'Healthy' ? '#4ADE80' : status === 'Critical' ? '#F87171' : '#FACC15', size: 70 })
             ),
-            React.createElement(RadialProgress, { progress: progress || 0, color: status === 'Healthy' ? '#4ADE80' : status === 'Critical' ? '#F87171' : '#FACC15', size: 70 })
-        ),
-        React.createElement('div', { className: 'grid grid-cols-2 gap-2 mt-4' },
-            React.createElement('div', { className: 'bg-dark-bg/50 p-2 rounded text-center' },
-                React.createElement('span', { className: 'block text-xs text-brand-text-light' }, "SPI"),
-                React.createElement('span', { className: `font-bold ${(spi || 1) >= 1 ? 'text-green-400' : 'text-red-400'}` }, spi || 1)
-            ),
-            React.createElement('div', { className: 'bg-dark-bg/50 p-2 rounded text-center' },
-                React.createElement('span', { className: 'block text-xs text-brand-text-light' }, "CPI"),
-                React.createElement('span', { className: `font-bold ${(cpi || 1) >= 1 ? 'text-green-400' : 'text-red-400'}` }, cpi || 1)
+            React.createElement('div', { className: 'grid grid-cols-2 gap-2 mt-4' },
+                React.createElement('div', { className: 'bg-dark-bg/50 p-2 rounded text-center' },
+                    React.createElement('span', { className: 'block text-xs text-brand-text-light' }, "SPI"),
+                    React.createElement('span', { className: `font-bold ${(spi || 1) >= 1 ? 'text-green-400' : 'text-red-400'}` }, spi || 1)
+                ),
+                React.createElement('div', { className: 'bg-dark-bg/50 p-2 rounded text-center' },
+                    React.createElement('span', { className: 'block text-xs text-brand-text-light' }, "CPI"),
+                    React.createElement('span', { className: `font-bold ${(cpi || 1) >= 1 ? 'text-green-400' : 'text-red-400'}` }, cpi || 1)
+                )
             )
         )
     );
@@ -313,8 +315,9 @@ const BudgetBurndown = ({ budget, currency = 'USD', kpi }) => {
     );
 };
 
-const MilestonesWidget = ({ milestones }) => {
-    // Expanded view logic
+const MilestonesWidget = ({ milestones, schedule }) => {
+    
+    // Expanded view logic (unchanged)
     const ExpandedView = (
         React.createElement('div', { className: 'space-y-4' },
             React.createElement('p', { className: 'text-brand-text-light' }, "Key project checkpoints and deliverables."),
@@ -361,6 +364,7 @@ const RiskRadarWidget = ({ risks }) => {
     const list = risks?.risks || [];
     const high = list.filter(r => r.severity === 'High').length;
     
+    // Categories calculation logic (unchanged)
     const categories = { 'Schedule': 0, 'Cost': 0, 'Scope': 0, 'Resource': 0 };
     list.forEach(r => {
         const txt = (r.title + r.description).toLowerCase();
@@ -636,7 +640,7 @@ const ProjectOverview = ({ language, projectData }) => {
                 ),
 
                 // Enhanced Bento Grid Layout
-                React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 auto-rows-[minmax(160px,auto)]' },
+                React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 auto-rows-[minmax(180px,auto)]' },
                     
                     // Row 1: Core Metrics
                     React.createElement('div', { className: 'md:col-span-1 lg:col-span-1' },
@@ -670,7 +674,7 @@ const ProjectOverview = ({ language, projectData }) => {
                             React.createElement('div', { className: 'md:col-span-2' },
                                 React.createElement(MiniGantt, { tasks: projectData?.schedule })
                             ),
-                            React.createElement('div', { className: 'md:col-span-1' },
+                            React.createElement('div', { className: 'md:col-span-1 h-full' },
                                 React.createElement(MilestonesWidget, { milestones, schedule: projectData?.schedule })
                             )
                         )

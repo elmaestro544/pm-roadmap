@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { getUserSettings, getEnv } from "./supabaseClient.js";
 
@@ -104,6 +103,32 @@ const convertSchemaToStandardJson = (geminiSchema) => {
     return schema;
 };
 
+// --- Helper: Retry Logic ---
+const fetchWithRetry = async (url, options, retries = 3, backoff = 1000) => {
+    try {
+        const response = await fetch(url, options);
+        if (!response.ok) {
+            // If server error (5xx), throw to trigger retry
+            if (response.status >= 500) {
+                throw new Error(`Server error: ${response.status}`);
+            }
+            // 429 Too Many Requests - also retry
+            if (response.status === 429) {
+                 throw new Error(`Rate limit exceeded: ${response.status}`);
+            }
+            return response; // 4xx errors are usually permanent (client error), return to handle
+        }
+        return response;
+    } catch (err) {
+        if (retries > 0) {
+            console.warn(`Fetch failed, retrying in ${backoff}ms... (${retries} attempts left)`, err);
+            await new Promise(resolve => setTimeout(resolve, backoff));
+            return fetchWithRetry(url, options, retries - 1, backoff * 2);
+        }
+        throw err;
+    }
+};
+
 // --- Provider Implementations ---
 
 const generateGoogleContent = async (client, model, prompt, schema, systemInstruction) => {
@@ -116,12 +141,21 @@ const generateGoogleContent = async (client, model, prompt, schema, systemInstru
         config.responseSchema = schema;
     }
 
-    const result = await client.models.generateContent({
-        model: model,
-        contents: { parts: [{ text: prompt }] },
-        config: config,
-    });
-    return result.text;
+    // Google SDK handles its own retries internally usually, but we wrap in try/catch
+    try {
+        const result = await client.models.generateContent({
+            model: model,
+            contents: { parts: [{ text: prompt }] },
+            config: config,
+        });
+        return result.text;
+    } catch (e) {
+        console.error("Google AI generation failed:", e);
+        if (e.message.includes('fetch')) {
+             throw new Error("Network error connecting to Google AI. Please check your connection.");
+        }
+        throw new Error(`Google AI Error: ${e.message}`);
+    }
 };
 
 const generateOpenAICompatibleContent = async (baseUrl, apiKey, model, prompt, schema, systemInstruction) => {
@@ -161,19 +195,27 @@ const generateOpenAICompatibleContent = async (baseUrl, apiKey, model, prompt, s
         }
     }
 
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(body)
-    });
+    try {
+        const response = await fetchWithRetry(`${baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(body)
+        });
 
-    if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(`AI API Error: ${response.status} ${err.error?.message || response.statusText}`);
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(`AI API Error: ${response.status} ${err.error?.message || response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data.choices[0].message.content;
+    } catch (error) {
+        console.error("AI Provider generation failed:", error);
+        if (error.message.includes('Failed to fetch')) {
+             throw new Error("Network error: Could not reach the AI provider. Check your internet connection.");
+        }
+        throw error;
     }
-
-    const data = await response.json();
-    return data.choices[0].message.content;
 };
 
 // --- Main Exported Function ---
@@ -223,7 +265,7 @@ export const fetchAvailableModels = async (provider, apiKey) => {
     if (provider === 'perplexity') url = 'https://api.perplexity.ai/models';
 
     try {
-        const res = await fetch(url, { headers });
+        const res = await fetchWithRetry(url, { headers });
         if (!res.ok) throw new Error("Failed to fetch models");
         const data = await res.json();
         
@@ -232,6 +274,8 @@ export const fetchAvailableModels = async (provider, apiKey) => {
         }
         return [];
     } catch (e) {
+        // Fallbacks on error to prevent UI crash
+        console.warn("Model fetch failed, using fallbacks:", e);
         if (provider === 'perplexity') return [{ id: 'sonar-pro', name: 'Sonar Pro' }, { id: 'sonar', name: 'Sonar' }];
         if (provider === 'openai') return [{ id: 'gpt-4o', name: 'GPT-4o' }, { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' }, { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }];
         throw e;
@@ -250,7 +294,6 @@ export const getModelId = getAdminModelId;
 // --- Chat Session Helper ---
 
 export const getGeminiClient = () => {
-    // Deprecated: Try to use resolveAIConfig where possible, but this is sync for legacy
     const provider = getAdminProvider();
     if (provider !== 'google') return null;
     const apiKey = getAdminApiKey();
@@ -280,13 +323,12 @@ export const createChatSessionAsync = async () => {
     }; 
 };
 
-// Deprecated Sync Version (Wraps default)
+// Deprecated Sync Version
 export const createChatSession = () => {
     return { isGeneric: true }; 
 };
 
 export const sendChatMessage = async (chatContext, message, file, useWebSearch) => {
-    // chatContext is the object returned by createChatSessionAsync
     const { session, config, isGeneric } = chatContext;
     
     if (!isGeneric && session && config.provider === 'google') {
@@ -301,7 +343,6 @@ export const sendChatMessage = async (chatContext, message, file, useWebSearch) 
         }
 
         if (useWebSearch) {
-            // Google Search Tool requires a fresh generation call, not chat stream usually
             const client = new GoogleGenAI({ apiKey: config.apiKey });
             const result = await client.models.generateContent({
                 model: config.model,
@@ -316,7 +357,6 @@ export const sendChatMessage = async (chatContext, message, file, useWebSearch) 
     } 
     else {
         // Generic Provider Call
-        // We use the config resolved during session creation to ensure consistency
         const responseText = await generateAIContent(message, null, "You are a helpful AI assistant for project management.");
         return { text: responseText, isStream: false, sources: [] };
     }
