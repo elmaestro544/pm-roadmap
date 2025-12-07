@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { generateScheduleFromPlan } from '../services/schedulingService.js';
-import { ScheduleIcon, Spinner, BoardIcon, ListIcon, TimelineIcon, ZoomInIcon, ZoomOutIcon, FullscreenIcon, FullscreenExitIcon, ExpandIcon, CollapseIcon, EditIcon, ExportIcon } from './Shared.js';
+import { ScheduleIcon, Spinner, BoardIcon, ListIcon, TimelineIcon, ZoomInIcon, ZoomOutIcon, FullscreenIcon, FullscreenExitIcon, ExpandIcon, CollapseIcon, EditIcon, ExportIcon, RefreshIcon } from './Shared.js';
 import { i18n } from '../constants.js';
 
 // --- Helper Functions ---
@@ -204,7 +203,6 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                         const startX = getLeftPos(predTask.start) + getWidth(predTask.start, predTask.end);
                         
                         // Orthogonal Path Logic
-                        // Start -> Right 10px -> Vertical -> Right to End
                         const x1 = startX;
                         const y1 = startY;
                         const x2 = endX;
@@ -212,10 +210,8 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                         
                         const midX = x1 + 10;
                         
-                        // Clean Right-Angle Path
                         let d = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
                         
-                        // Fallback for overlapping/backward cases to keep neat
                         if (midX > x2) {
                              const fallbackMidY = y1 + (y2 > y1 ? 10 : -10);
                              d = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${fallbackMidY} L ${x2 - 10} ${fallbackMidY} L ${x2 - 10} ${y2} L ${x2} ${y2}`;
@@ -497,29 +493,30 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
     const [expanded, setExpanded] = useState(new Set());
     const [isFullscreen, setIsFullscreen] = useState(false);
 
+    const generate = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            // Pass criteria (e.g. duration constraint) if available
+            const schedule = await generateScheduleFromPlan(projectData.plan, projectData.criteria);
+            onUpdateProject({ schedule });
+            const projectIds = schedule.filter(t => t.type === 'project').map(t => t.id);
+            setExpanded(new Set(projectIds));
+        } catch (err) {
+            setError(err.message || "Failed to generate schedule.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
         if (projectData.plan && !projectData.schedule && !isLoading) {
-             const generate = async () => {
-                try {
-                    setIsLoading(true);
-                    setError(null);
-                    // Pass criteria (e.g. duration constraint) if available
-                    const schedule = await generateScheduleFromPlan(projectData.plan, projectData.criteria);
-                    onUpdateProject({ schedule });
-                    const projectIds = schedule.filter(t => t.type === 'project').map(t => t.id);
-                    setExpanded(new Set(projectIds));
-                } catch (err) {
-                    setError(err.message || "Failed to generate schedule.");
-                } finally {
-                    setIsLoading(false);
-                }
-            };
             generate();
         } else if (projectData.schedule && expanded.size === 0) {
              const projectIds = projectData.schedule.filter(t => t.type === 'project').map(t => t.id);
              setExpanded(new Set(projectIds));
         }
-    }, [projectData.plan, projectData.schedule, projectData.criteria, isLoading, onUpdateProject, setIsLoading, setError]);
+    }, [projectData.plan, projectData.schedule, projectData.criteria, isLoading]);
 
     const handleUpdateTask = (id, field, value) => {
         const updatedSchedule = projectData.schedule.map(t => 
@@ -599,6 +596,14 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
         }, icon)
     );
 
+    const customControls = (
+        React.createElement('button', {
+            onClick: generate,
+            className: 'p-2 rounded-md text-brand-text-light hover:bg-white/10 hover:text-white transition-colors',
+            title: "Regenerate Schedule"
+        }, React.createElement(RefreshIcon, { className: "h-5 w-5" }))
+    );
+
     return React.createElement('div', { ref: fullscreenRef, className: "h-full flex flex-col text-white bg-dark-card printable-container" },
         // --- Unified Compact Header ---
         React.createElement('div', { className: 'non-printable flex-shrink-0 border-b border-dark-border bg-dark-card/50 px-4 h-14 flex items-center justify-between' },
@@ -622,6 +627,9 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
              
              // Tools (Right)
              React.createElement('div', { className: 'flex items-center gap-2' },
+                customControls,
+                React.createElement('div', { className: 'w-px h-6 bg-dark-border mx-1' }),
+
                 viewMode === 'timeline' && React.createElement(React.Fragment, null,
                     React.createElement(IconButton, { icon: React.createElement(ZoomOutIcon), onClick: () => setZoom(z => Math.max(z - 0.2, 0.5)), tooltip: "Zoom Out" }),
                     React.createElement(IconButton, { icon: React.createElement(ZoomInIcon), onClick: () => setZoom(z => Math.min(z + 0.2, 2)), tooltip: "Zoom In" }),

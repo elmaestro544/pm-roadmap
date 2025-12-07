@@ -1,9 +1,8 @@
-
 // components/BudgetView.js
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { generateProjectBudget } from '../services/budgetService.js';
-import { BudgetIcon, Spinner, FeatureToolbar } from './Shared.js';
+import { BudgetIcon, Spinner, FeatureToolbar, RefreshIcon } from './Shared.js';
 import { i18n } from '../constants.js';
 
 
@@ -92,31 +91,31 @@ const BudgetView = ({ language, projectData, onUpdateProject, isLoading, setIsLo
     const fullscreenRef = useRef(null);
     const currency = projectData.criteria?.currency || 'USD';
 
+    const generate = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            // Pass criteria to budget service
+            const budget = await generateProjectBudget({
+                objectives: projectData.objective,
+                scope: "A standard project scope including planning, execution, and closure.",
+                // Fallback values if criteria is missing
+                currency: currency,
+                contingency: '15'
+            }, projectData.criteria);
+            onUpdateProject({ budget });
+        } catch (err) {
+            setError(err.message || "Failed to generate budget.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
         if (projectData.objective && !projectData.budget && !isLoading) {
-             const generate = async () => {
-                try {
-                    setIsLoading(true);
-                    setError(null);
-                    // Pass criteria to budget service
-                    const budget = await generateProjectBudget({
-                        objectives: projectData.objective,
-                        scope: "A standard project scope including planning, execution, and closure.",
-                        // Fallback values if criteria is missing
-                        currency: currency,
-                        contingency: '15'
-                    }, projectData.criteria);
-                    onUpdateProject({ budget });
-                } catch (err) {
-                    setError(err.message || "Failed to generate budget.");
-                } finally {
-                    setIsLoading(false);
-                }
-            };
-            generate();
+             generate();
         }
-    }, [projectData.objective, projectData.budget, projectData.criteria, currency, isLoading, onUpdateProject, setIsLoading, setError]);
-
+    }, [projectData.objective, projectData.budget, isLoading]); // Reduced deps to avoid loops
 
     const renderContent = () => {
         if (isLoading) return React.createElement(LoadingView, null);
@@ -124,8 +123,21 @@ const BudgetView = ({ language, projectData, onUpdateProject, isLoading, setIsLo
         return React.createElement(LoadingView, null);
     };
 
+    const customControls = (
+        React.createElement('button', {
+            onClick: generate,
+            className: 'p-2 rounded-md text-brand-text-light hover:bg-white/10 hover:text-white transition-colors',
+            title: "Regenerate Budget"
+        }, React.createElement(RefreshIcon, { className: "h-5 w-5" }))
+    );
 
     return React.createElement('div', { ref: fullscreenRef, className: "h-full flex flex-col text-white bg-dark-card printable-container" },
+       React.createElement(FeatureToolbar, {
+            title: t.dashboardBudget,
+            containerRef: fullscreenRef,
+            onExport: () => window.print(),
+            customControls: customControls
+        }),
        React.createElement('div', { className: 'flex-grow min-h-0 overflow-y-auto' },
            React.createElement('div', {
                className: 'p-6 printable-content h-full flex flex-col',
