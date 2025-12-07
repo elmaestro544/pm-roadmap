@@ -1,9 +1,7 @@
 
-// components/SCurveView.js
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { generateSCurveReport } from '../services/sCurveService.js';
-import { SCurveIcon, Spinner, FeatureToolbar, BarChartIcon } from './Shared.js';
+import { SCurveIcon, Spinner, FeatureToolbar, BarChartIcon, RefreshIcon } from './Shared.js';
 import { i18n } from '../constants.js';
 
 // --- Sub-Components ---
@@ -17,7 +15,7 @@ const LoadingView = () => (
     )
 );
 
-const SVGChart = ({ data, showBars }) => {
+const SVGChart = ({ data, showBars, currency }) => {
     const svgRef = useRef(null);
     const [tooltip, setTooltip] = useState(null);
 
@@ -38,7 +36,9 @@ const SVGChart = ({ data, showBars }) => {
     const linePath = (dataKey) => {
         let path = `M ${xScale(0)},${yScale(points[0][dataKey])}`;
         points.slice(1).forEach((p, i) => {
-            path += ` L ${xScale(i + 1)},${yScale(p[dataKey] === null ? 0 : p[dataKey])}`;
+            if (p[dataKey] !== null) {
+                path += ` L ${xScale(i + 1)},${yScale(p[dataKey])}`;
+            }
         });
         return path;
     };
@@ -56,18 +56,18 @@ const SVGChart = ({ data, showBars }) => {
                 point,
                 x: xScale(index) + margin.left,
                 yPlanned: yScale(point.planned) + margin.top,
-                yActual: yScale(point.actual) + margin.top
+                yActual: point.actual !== null ? yScale(point.actual) + margin.top : null
             });
         }
     };
     
     const handleMouseLeave = () => setTooltip(null);
     
-    const getTickCount = () => {
-        if (points.length > 20) return 10;
-        if (points.length > 10) return 5;
-        return points.length -1;
-    };
+    const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency, notation: "compact" }).format(val);
+
+    // Calculate Tick Dates (Show ~6-8 ticks max)
+    const tickInterval = Math.ceil(points.length / 8);
+    const ticks = points.filter((_, i) => i % tickInterval === 0);
 
     return React.createElement('div', { className: 'relative' },
         React.createElement('svg', {
@@ -82,10 +82,8 @@ const SVGChart = ({ data, showBars }) => {
                 // Axes
                 React.createElement('line', { x1: 0, y1: chartHeight, x2: chartWidth, y2: chartHeight, className: 'stroke-slate-600' }),
                 React.createElement('line', { x1: 0, y1: 0, x2: 0, y2: chartHeight, className: 'stroke-slate-600' }),
-                React.createElement('text', { x: chartWidth / 2, y: chartHeight + 40, className: 'fill-slate-400 text-sm text-anchor-middle' }, 'Project Duration'),
-                React.createElement('text', { transform: `rotate(-90)`, x: -chartHeight / 2, y: -40, className: 'fill-slate-400 text-sm text-anchor-middle' }, 'Cumulative / Period Progress (%)'),
                 
-                // Y-Axis Ticks
+                // Y-Axis Ticks & Labels
                 [0, 25, 50, 75, 100].map(tick => (
                     React.createElement('g', { key: tick, transform: `translate(0, ${yScale(tick)})` },
                         React.createElement('line', { x1: -5, y1: 0, x2: chartWidth, y2: 0, className: 'stroke-slate-700/50 stroke-dasharray-2' }),
@@ -93,183 +91,119 @@ const SVGChart = ({ data, showBars }) => {
                     )
                 )),
                 
-                // Optional: Incremental Bars
-                showBars && points.map((p, i) => {
-                    const x = xScale(i);
-                    const prevPlanned = i > 0 ? points[i-1].planned : 0;
-                    const prevActual = i > 0 ? points[i-1].actual : 0;
-                    
-                    const incPlanned = Math.max(0, p.planned - prevPlanned);
-                    const incActual = Math.max(0, p.actual - prevActual);
-                    
-                    const barWidth = (chartWidth / points.length) * 0.4;
-                    const offset = barWidth / 2;
-
-                    return React.createElement('g', { key: `bar-${i}` },
-                        // Incremental Planned (Transparent/Outline)
-                        React.createElement('rect', {
-                            x: x - offset - 2,
-                            y: yScale(incPlanned),
-                            width: barWidth,
-                            height: chartHeight - yScale(incPlanned),
-                            fill: 'transparent',
-                            stroke: 'rgba(14, 165, 233, 0.5)',
-                            strokeWidth: 1
-                        }),
-                        // Incremental Actual (Solid)
-                        React.createElement('rect', {
-                            x: x + 2,
-                            y: yScale(incActual),
-                            width: barWidth,
-                            height: chartHeight - yScale(incActual),
-                            fill: 'rgba(45, 212, 191, 0.3)',
-                            stroke: 'none'
-                        })
-                    );
-                }),
-
-                // X-Axis Ticks
-                Array.from({ length: getTickCount() + 1 }).map((_, i) => {
-                    const tickIndex = Math.round(i * (points.length - 1) / getTickCount());
-                    const point = points[tickIndex];
-                    if (!point) return null;
-                    return React.createElement('g', { key: i, transform: `translate(${xScale(tickIndex)}, ${chartHeight})`},
+                // X-Axis Ticks & Labels (Enhanced Date Format)
+                ticks.map((p, i) => {
+                    const index = points.indexOf(p);
+                    return React.createElement('g', { key: i, transform: `translate(${xScale(index)}, ${chartHeight})`},
                          React.createElement('line', { y1: 0, y2: 5, className: 'stroke-slate-600' }),
-                         React.createElement('text', { y: 20, className: 'fill-slate-400 text-xs text-anchor-middle' }, point.label)
-                    )
+                         React.createElement('text', { 
+                             y: 20, 
+                             className: 'fill-slate-400 text-xs text-anchor-middle',
+                             transform: `rotate(0)` // Removed rotation for cleaner look if space allows
+                         }, new Date(p.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+                    );
                 }),
                 
                 // Lines
                 React.createElement('path', { d: linePath('planned'), className: 'fill-none stroke-sky-500 stroke-2' }),
                 React.createElement('path', { d: linePath('actual'), className: 'fill-none stroke-brand-purple-light stroke-2' }),
 
-                // Tooltip line and circles
+                // Optional: Incremental Bars
+                showBars && points.map((p, i) => {
+                    if (i === 0) return null;
+                    const x = xScale(i);
+                    const prevPlanned = points[i-1].planned;
+                    const prevActual = points[i-1].actual;
+                    
+                    const incPlanned = Math.max(0, p.planned - prevPlanned);
+                    const incActual = p.actual !== null ? Math.max(0, p.actual - (prevActual || 0)) : 0;
+                    
+                    const barWidth = (chartWidth / points.length) * 0.4;
+                    
+                    // Simple bars for Period Progress % (scaled x2 to be visible)
+                    const barHeightP = (incPlanned * 4); 
+                    const barHeightA = (incActual * 4);
+
+                    return React.createElement('g', { key: `bar-${i}` },
+                        React.createElement('rect', {
+                            x: x - barWidth, y: chartHeight - barHeightP, width: barWidth, height: barHeightP,
+                            fill: 'rgba(14, 165, 233, 0.3)'
+                        }),
+                        p.actual !== null && React.createElement('rect', {
+                            x: x, y: chartHeight - barHeightA, width: barWidth, height: barHeightA,
+                            fill: 'rgba(45, 212, 191, 0.5)'
+                        })
+                    );
+                }),
+
+                // Tooltip Highlight
                 tooltip && React.createElement('g', null,
                      React.createElement('line', { x1: tooltip.x - margin.left, y1: 0, x2: tooltip.x - margin.left, y2: chartHeight, className: 'stroke-slate-500' }),
                      React.createElement('circle', { cx: tooltip.x - margin.left, cy: tooltip.yPlanned - margin.top, r: 4, className: 'fill-sky-500' }),
-                     React.createElement('circle', { cx: tooltip.x - margin.left, cy: tooltip.yActual - margin.top, r: 4, className: 'fill-brand-purple-light' })
+                     tooltip.yActual && React.createElement('circle', { cx: tooltip.x - margin.left, cy: tooltip.yActual - margin.top, r: 4, className: 'fill-brand-purple-light' })
                 )
             )
         ),
+        // Tooltip Content
         tooltip && React.createElement('div', {
-            className: 'absolute bg-dark-card-solid p-2 rounded-md text-xs pointer-events-none border border-dark-border shadow-lg z-10',
-            style: { left: tooltip.x + 10, top: (tooltip.yPlanned + tooltip.yActual)/2 - 30 }
+            className: 'absolute bg-dark-card-solid p-3 rounded-lg text-xs pointer-events-none border border-dark-border shadow-xl z-20 w-48',
+            style: { left: Math.min(tooltip.x + 10, width - 200), top: 10 }
         },
-            React.createElement('p', { className: 'font-bold' }, `${tooltip.point.label}`),
-            React.createElement('p', null, React.createElement('span', { className: 'text-sky-400' }, 'Cumulative Planned: '), `${tooltip.point.planned}%`),
-            React.createElement('p', null, React.createElement('span', { className: 'text-brand-purple-light' }, 'Cumulative Actual: '), `${tooltip.point.actual}%`)
+            React.createElement('p', { className: 'font-bold text-white mb-2' }, tooltip.point.label || tooltip.point.date),
+            React.createElement('div', { className: 'grid grid-cols-2 gap-x-2 gap-y-1' },
+                React.createElement('span', { className: 'text-sky-400 font-semibold' }, 'Planned:'),
+                React.createElement('span', { className: 'text-right' }, `${tooltip.point.planned}%`),
+                React.createElement('span', { className: 'text-brand-text-light' }, 'PV:'),
+                React.createElement('span', { className: 'text-right' }, formatCurrency(tooltip.point.pv)),
+
+                React.createElement('span', { className: 'text-brand-purple-light font-semibold' }, 'Actual:'),
+                React.createElement('span', { className: 'text-right' }, tooltip.point.actual !== null ? `${tooltip.point.actual}%` : '-'),
+                React.createElement('span', { className: 'text-brand-text-light' }, 'EV:'),
+                React.createElement('span', { className: 'text-right' }, tooltip.point.ev !== null ? formatCurrency(tooltip.point.ev) : '-')
+            )
         )
     );
 };
 
-const EditableDataTable = ({ data, setData }) => {
+const EvmCard = ({ title, value, subtext, color = 'text-white' }) => (
+    React.createElement('div', { className: 'bg-dark-card p-4 rounded-lg border border-dark-border text-center' },
+        React.createElement('p', { className: 'text-xs text-brand-text-light uppercase tracking-wider' }, title),
+        React.createElement('p', { className: `text-2xl font-bold my-1 ${color}` }, value),
+        subtext && React.createElement('p', { className: 'text-xs text-slate-500' }, subtext)
+    )
+);
 
-    const handleActualChange = (index, value) => {
-        const newValue = Math.max(0, Math.min(100, Number(value)));
-        const newData = [...data];
-        newData[index] = { ...newData[index], actual: newValue };
-        setData(newData);
-    };
-
-    return React.createElement('div', { className: 'flex-grow overflow-y-auto bg-dark-card-solid rounded-xl border border-dark-border' },
-        React.createElement('table', { className: 'w-full text-sm text-left' },
-            React.createElement('thead', { className: 'sticky top-0 bg-dark-card z-10' },
-                React.createElement('tr', { className: 'text-brand-text-light border-b border-dark-border' },
-                    ['Period', 'Planned %', 'Actual %'].map(h => React.createElement('th', { key: h, className: 'p-3 font-semibold' }, h))
-                )
-            ),
-            React.createElement('tbody', { className: 'divide-y divide-dark-border' }, data.map((point, index) =>
-                React.createElement('tr', { key: index, className: 'hover:bg-dark-card' },
-                    React.createElement('td', { className: 'p-3 font-semibold' }, point.label),
-                    React.createElement('td', { className: 'p-3' }, `${point.planned.toFixed(2)}%`),
-                    React.createElement('td', { className: 'p-3' },
-                        React.createElement('input', {
-                            type: 'number',
-                            value: point.actual,
-                            onChange: e => handleActualChange(index, e.target.value),
-                            min: 0,
-                            max: 100,
-                            className: 'w-24 p-1 bg-dark-bg border border-dark-border rounded-md text-white focus:ring-2 focus:ring-brand-purple focus:outline-none'
-                        })
-                    )
-                )
-            ))
-        )
-    );
-};
-
-
-const ResultsView = ({ rawData, analysis, scale, showBars }) => {
+const ResultsView = ({ rawData, analysis, scale, showBars, currency }) => {
     const [displayData, setDisplayData] = useState([]);
 
     useEffect(() => {
         if (!rawData || !rawData.points) return;
-        
-        if (scale === 'days') {
-            const dailyData = rawData.points.map(p => ({...p, label: `Day ${p.day}`}));
-            setDisplayData(dailyData);
-            return;
-        }
-        
-        if (scale === 'weeks') {
-            const weeklyData = [];
-            for (let i = 0; i < rawData.points.length; i += 7) {
-                const weekChunk = rawData.points.slice(i, i + 7);
-                const weekEndData = weekChunk[weekChunk.length - 1];
-                weeklyData.push({ ...weekEndData, label: `Week ${Math.floor(i / 7) + 1}` });
-            }
-            setDisplayData(weeklyData);
-            return;
-        }
+        setDisplayData(rawData.points);
+    }, [rawData]);
 
-        if (scale === 'months') {
-            const monthlyData = [];
-            const byMonth = rawData.points.reduce((acc, point) => {
-                const month = point.date.substring(0, 7); // YYYY-MM
-                if (!acc[month]) acc[month] = [];
-                acc[month].push(point);
-                return acc;
-            }, {});
-            
-            for (const monthKey in byMonth) {
-                const monthPoints = byMonth[monthKey];
-                const monthEndData = monthPoints[monthPoints.length - 1];
-                const monthLabel = new Date(monthEndData.date).toLocaleString('default', { month: 'short', year: 'numeric' });
-                monthlyData.push({ ...monthEndData, label: monthLabel });
-            }
-            setDisplayData(monthlyData);
-            return;
-        }
-
-        if (scale === 'quarters') {
-            const quarterlyData = [];
-            const byQuarter = rawData.points.reduce((acc, point) => {
-                const date = new Date(point.date);
-                const quarter = Math.floor(date.getMonth() / 3) + 1;
-                const year = date.getFullYear();
-                const key = `${year}-Q${quarter}`;
-                if (!acc[key]) acc[key] = [];
-                acc[key].push(point);
-                return acc;
-            }, {});
-
-            for (const qKey in byQuarter) {
-                const qPoints = byQuarter[qKey];
-                const qEndData = qPoints[qPoints.length - 1]; // Cumulative value at end of quarter
-                quarterlyData.push({ ...qEndData, label: qKey });
-            }
-            setDisplayData(quarterlyData);
-            return;
-        }
-
-    }, [rawData, scale]);
-
+    // Get current status (last point with actual data)
+    const currentStatus = useMemo(() => {
+        const points = rawData?.points || [];
+        const lastActual = [...points].reverse().find(p => p.actual !== null);
+        return lastActual || points[0] || {};
+    }, [rawData]);
+    
+    const format = (v) => new Intl.NumberFormat('en-US', { style: 'currency', currency, notation: "compact" }).format(v || 0);
 
     return React.createElement('div', { className: 'w-full h-full flex flex-col gap-6 animate-fade-in-up' },
-        React.createElement('div', { className: 'bg-dark-card-solid p-6 rounded-xl border border-dark-border glow-border' },
-            React.createElement(SVGChart, { data: displayData, showBars: showBars })
+        React.createElement('div', { className: 'bg-dark-card-solid p-6 rounded-xl border border-dark-border glow-border h-96' },
+            React.createElement(SVGChart, { data: displayData, showBars: showBars, currency: currency })
         ),
-        React.createElement('div', { className: 'flex-grow grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[300px]' },
+        
+        // EVM Dashboard Section
+        React.createElement('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4' },
+            React.createElement(EvmCard, { title: "BAC (Budget)", value: format(rawData?.totalBudget), subtext: "Total Planned" }),
+            React.createElement(EvmCard, { title: "Planned Value (PV)", value: format(currentStatus.pv), subtext: "Should be done" }),
+            React.createElement(EvmCard, { title: "Earned Value (EV)", value: format(currentStatus.ev), subtext: "Actually done" }),
+            React.createElement(EvmCard, { title: "Actual Cost (AC)", value: format(currentStatus.ac), subtext: "Estimated spend" })
+        ),
+
+        React.createElement('div', { className: 'flex-grow grid grid-cols-1 md:grid-cols-2 gap-6' },
             React.createElement('div', { className: 'bg-dark-card-solid p-6 rounded-xl border border-dark-border glow-border' },
                 React.createElement('h3', { className: 'text-lg font-bold text-white mb-4' }, 'AI Analysis'),
                 React.createElement('div', { className: 'space-y-4' },
@@ -283,8 +217,21 @@ const ResultsView = ({ rawData, analysis, scale, showBars }) => {
                     )
                 )
             ),
-            React.createElement('div', { className: 'flex flex-col min-h-0' },
-                React.createElement(EditableDataTable, { data: displayData, setData: setDisplayData })
+             React.createElement('div', { className: 'bg-dark-card-solid p-6 rounded-xl border border-dark-border glow-border flex flex-col justify-center gap-4' },
+                React.createElement('div', { className: 'flex justify-between items-center border-b border-dark-border pb-2' },
+                    React.createElement('span', { className: 'text-brand-text-light' }, "Schedule Performance Index (SPI)"),
+                    React.createElement('span', { className: `font-bold ${currentStatus.spi >= 1 ? 'text-green-400' : 'text-red-400'}` }, currentStatus.spi)
+                ),
+                React.createElement('div', { className: 'flex justify-between items-center border-b border-dark-border pb-2' },
+                    React.createElement('span', { className: 'text-brand-text-light' }, "Cost Performance Index (CPI)"),
+                    React.createElement('span', { className: `font-bold ${currentStatus.cpi >= 1 ? 'text-green-400' : 'text-red-400'}` }, currentStatus.cpi)
+                ),
+                React.createElement('div', { className: 'flex justify-between items-center' },
+                    React.createElement('span', { className: 'text-brand-text-light' }, "Estimate at Completion (EAC)"),
+                    React.createElement('span', { className: 'font-bold text-white' }, 
+                         format(rawData?.totalBudget / (currentStatus.cpi || 1))
+                    )
+                )
             )
         )
     );
@@ -295,40 +242,52 @@ const SCurveView = ({ language, projectData, onUpdateProject, isLoading, setIsLo
     const fullscreenRef = useRef(null);
     const [scale, setScale] = useState('days');
     const [showBars, setShowBars] = useState(false);
+    const currency = projectData.criteria?.currency || 'USD';
+
+    const generate = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            // Pass total budget to service
+            const budgetTotal = projectData.criteria?.budget || 0;
+            const sCurveReport = await generateSCurveReport(projectData.schedule, budgetTotal);
+            onUpdateProject({ sCurveReport });
+        } catch (err) {
+            setError(err.message || "Failed to generate S-Curve report.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
         if (projectData.schedule && !projectData.sCurveReport && !isLoading) {
-            const generate = async () => {
-                try {
-                    setIsLoading(true);
-                    setError(null);
-                    const sCurveReport = await generateSCurveReport(projectData.schedule);
-                    onUpdateProject({ sCurveReport });
-                } catch (err) {
-                    setError(err.message || "Failed to generate S-Curve report.");
-                } finally {
-                    setIsLoading(false);
-                }
-            };
             generate();
         }
-    }, [projectData.schedule, projectData.sCurveReport, isLoading, onUpdateProject, setIsLoading, setError]);
+    }, [projectData.schedule, projectData.sCurveReport, isLoading]);
 
     const renderContent = () => {
         if (isLoading) return React.createElement(LoadingView, null);
         if (projectData.sCurveReport) {
             const { sCurveData, analysis } = projectData.sCurveReport;
-            return React.createElement(ResultsView, { rawData: sCurveData, analysis: analysis, scale: scale, showBars: showBars });
+            return React.createElement(ResultsView, { rawData: sCurveData, analysis: analysis, scale: scale, showBars: showBars, currency: currency });
         }
         return React.createElement(LoadingView, null);
     };
 
     const customControls = (
-        React.createElement('button', {
-            onClick: () => setShowBars(!showBars),
-            className: `p-2 rounded-md transition-colors ${showBars ? 'bg-brand-purple text-white' : 'text-brand-text-light hover:bg-white/10 hover:text-white'}`,
-            title: "Toggle Period Bars"
-        }, React.createElement(BarChartIcon, { className: "h-5 w-5" }))
+        React.createElement('div', { className: 'flex items-center gap-2' },
+            React.createElement('button', {
+                onClick: generate,
+                className: 'p-2 rounded-md text-brand-text-light hover:bg-white/10 hover:text-white transition-colors',
+                title: "Regenerate Analysis"
+            }, React.createElement(RefreshIcon, { className: "h-5 w-5" })),
+            React.createElement('div', { className: 'w-px h-6 bg-dark-border mx-1' }),
+            React.createElement('button', {
+                onClick: () => setShowBars(!showBars),
+                className: `p-2 rounded-md transition-colors ${showBars ? 'bg-brand-purple text-white' : 'text-brand-text-light hover:bg-white/10 hover:text-white'}`,
+                title: "Toggle Period Bars"
+            }, React.createElement(BarChartIcon, { className: "h-5 w-5" }))
+        )
     );
 
     return React.createElement('div', { ref: fullscreenRef, className: "h-full flex flex-col text-white bg-dark-card printable-container" },
