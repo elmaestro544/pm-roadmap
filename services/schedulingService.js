@@ -58,7 +58,7 @@ export const generateScheduleFromPlan = async (projectPlan, criteria) => {
         1. **Structure**: Convert WBS items to tasks. Use 'project' for phases/parents, 'task' for actionable items.
         2. **Dates**: Calculate realistic start/end dates based on dependencies.
         3. **Dependencies**: Logic is Key. Task B cannot start until Task A finishes. Populate 'dependencies' array with IDs of predecessors.
-        4. **Resource Loading**: Assign a specific Role or Resource Name to every task (e.g., "Site Foreman", "Architect", "Excavator").
+        4. **Resource Loading**: Assign a specific Role or Resource Name to every task (e.g. "Site Foreman", "Architect", "Excavator").
         5. **Cost Loading**: Distribute the estimated project value into individual task costs. 
            ${totalBudget > 0 ? `The sum of all task costs MUST equal approximately ${totalBudget} ${currency}.` : `Estimate costs in ${currency}.`}
         
@@ -69,26 +69,89 @@ export const generateScheduleFromPlan = async (projectPlan, criteria) => {
 
     try {
         const jsonText = await generateAIContent(prompt, ganttChartSchema, systemInstruction);
-        const scheduleData = JSON.parse(jsonText.trim());
+        let scheduleData = JSON.parse(jsonText.trim());
 
-        // Post-processing for hierarchy (same as before)
-        const projects = scheduleData.filter(item => item.type === 'project').sort((a, b) => a.start.localeCompare(b.start));
-        const tasksByProject = scheduleData.filter(item => item.type === 'task').reduce((acc, task) => {
-            const projectId = task.project || 'unassigned';
-            if (!acc[projectId]) acc[projectId] = [];
-            acc[projectId].push(task);
-            return acc;
-        }, {});
+        // --- Post-Processing for Robust Hierarchy ---
 
-        const sorted = [];
-        projects.forEach(project => {
-            sorted.push(project);
-            if (tasksByProject[project.id]) sorted.push(...tasksByProject[project.id].sort((a, b) => a.start.localeCompare(b.start)));
-        });
-        sorted.push(...scheduleData.filter(item => item.type === 'milestone').sort((a,b) => a.start.localeCompare(b.start)));
-        if (tasksByProject['unassigned']) sorted.push(...tasksByProject['unassigned'].sort((a,b) => a.start.localeCompare(b.start)));
+        // 1. Sanitize IDs
+        scheduleData.forEach(t => t.id = String(t.id));
 
-        return sorted;
+        // 2. Ensure Root Node Exists
+        const rootId = 'ROOT-SUMMARY';
+        let rootNode = scheduleData.find(t => t.id === rootId);
+
+        if (!rootNode) {
+            // Determine bounds from all items
+            const starts = scheduleData.map(t => new Date(t.start).getTime()).filter(d => !isNaN(d));
+            const ends = scheduleData.map(t => new Date(t.end).getTime()).filter(d => !isNaN(d));
+            const minStart = starts.length ? new Date(Math.min(...starts)) : new Date(projectStartDate);
+            const maxEnd = ends.length ? new Date(Math.max(...ends)) : new Date(projectStartDate);
+            
+            // Calculate aggregations
+            const totalCost = scheduleData.reduce((acc, t) => acc + (t.cost || 0), 0);
+            const tasks = scheduleData.filter(t => t.type === 'task');
+            const avgProgress = tasks.length > 0 
+                ? tasks.reduce((acc, t) => acc + (t.progress || 0), 0) / tasks.length 
+                : 0;
+
+            rootNode = {
+                id: rootId,
+                name: "Project Summary: " + (criteria?.title || "Overall Project"),
+                start: minStart.toISOString().split('T')[0],
+                end: maxEnd.toISOString().split('T')[0],
+                progress: Math.round(avgProgress),
+                type: 'project',
+                project: null,
+                dependencies: [],
+                cost: totalCost,
+                resource: 'Project Manager'
+            };
+            
+            // Re-parent top-level items to Root
+            scheduleData.forEach(t => {
+                if (!t.project || t.project === 'unassigned' || t.project === 'root') {
+                    t.project = rootId;
+                }
+            });
+            scheduleData.unshift(rootNode);
+        }
+
+        // 3. Build DFS Sorted Hierarchy with Levels
+        const hierarchy = [];
+        const visited = new Set();
+
+        const processNode = (node, level) => {
+            if (visited.has(node.id)) return;
+            visited.add(node.id);
+
+            const nodeWithLevel = { ...node, level };
+            hierarchy.push(nodeWithLevel);
+
+            // Find children
+            const children = scheduleData.filter(t => t.project === node.id);
+            
+            // Sort Children: Projects(Phases) first, then Tasks, then by Start Date
+            children.sort((a, b) => {
+                if (a.type !== b.type) return a.type === 'project' ? -1 : 1;
+                return new Date(a.start) - new Date(b.start);
+            });
+
+            children.forEach(child => processNode(child, level + 1));
+        };
+
+        // Start from Root
+        processNode(rootNode, 0);
+
+        // Capture orphans (circular deps or bad parent IDs from AI)
+        const orphans = scheduleData.filter(t => !visited.has(t.id));
+        if (orphans.length > 0) {
+            orphans.forEach(t => {
+                t.project = rootId; // Force attach
+                processNode(t, 1);
+            });
+        }
+
+        return hierarchy;
 
     } catch (error) {
         console.error("Error generating project schedule:", error);
