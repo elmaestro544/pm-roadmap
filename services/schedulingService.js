@@ -17,7 +17,7 @@ const ganttChartSchema = {
             project: { type: Type.STRING, description: "Parent ID" },
             dependencies: { type: Type.ARRAY, items: { type: Type.STRING } },
             cost: { type: Type.NUMBER, description: "Estimated cost for this specific task" },
-            resource: { type: Type.STRING, description: "Person or Role assigned (e.g. 'Civil Engineer')" }
+            resource: { type: Type.STRING, description: "Execution Resource (Machinery, Equipment, Material) e.g. 'Excavator'" }
         },
         required: ['id', 'name', 'start', 'end', 'progress', 'type', 'cost', 'resource']
     }
@@ -58,9 +58,8 @@ export const generateScheduleFromPlan = async (projectPlan, criteria) => {
         1. **Structure**: Convert WBS items to tasks. Use 'project' for phases/parents, 'task' for actionable items.
         2. **Dates**: Calculate realistic start/end dates based on dependencies.
         3. **Dependencies**: Logic is Key. Task B cannot start until Task A finishes. Populate 'dependencies' array with IDs of predecessors.
-        4. **Resource Loading**: Assign a specific Role or Resource Name to every task (e.g. "Site Foreman", "Architect", "Excavator").
-        5. **Cost Loading**: Distribute the estimated project value into individual task costs. 
-           ${totalBudget > 0 ? `The sum of all task costs MUST equal approximately ${totalBudget} ${currency}.` : `Estimate costs in ${currency}.`}
+        4. **Resource Loading**: Assign specific **Execution Resources** (Machinery, Equipment, Materials, Labor Crews) required to execute the task (e.g., "Excavator", "Concrete Mixer", "Paving Machine", "Server Rack"). Do NOT simply list staff titles like "Manager" or "Engineer" unless it refers to a specific crew.
+        5. **Cost Loading**: Distribute costs realistically. ${totalBudget > 0 ? `The sum of all task costs MUST EQUAL the Total Budget of ${totalBudget} ${currency}.` : `Estimate realistic costs in ${currency} based on the scope.`}
         
         Return a JSON array matching the schema.
     `;

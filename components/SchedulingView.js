@@ -41,7 +41,7 @@ const LoadingView = () => (
     React.createElement('div', { className: 'text-center flex flex-col items-center h-full justify-center' },
         React.createElement(ScheduleIcon, { className: 'h-16 w-16 animate-pulse text-brand-purple-light' }),
         React.createElement('h2', { className: 'text-3xl font-bold mt-4 mb-2 text-white' }, "Building Schedule..."),
-        React.createElement('p', { className: 'text-brand-text-light mb-8' }, "Calculating critical path, assigning resources, and loading costs."),
+        React.createElement('p', { className: 'text-brand-text-light mb-8' }, "Calculating critical path, assigning execution resources, and loading costs."),
         React.createElement(Spinner, { size: '12' })
     )
 );
@@ -147,10 +147,7 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                 taskWithColor.color = '#1E1B2E'; 
             } else if (task.type === 'task') {
                 // Check if ALL parents up the chain are expanded
-                let current = task;
                 let visible = true;
-                // Simple 1-level check for now, for deep nesting we'd need a map or recursive check
-                // Assuming `expanded` set contains IDs of expanded parents
                 if (task.project && !expanded.has(task.project) && task.project !== 'ROOT-SUMMARY') {
                     visible = false;
                 }
@@ -194,7 +191,7 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
     const detailedColumns = [
         { id: 'start', label: 'Start', width: 90, render: t => formatDate(t.start) },
         { id: 'end', label: 'End', width: 90, render: t => formatDate(t.end) },
-        { id: 'resource', label: 'Resource', width: 120, render: t => t.resource || '-' },
+        { id: 'resource', label: 'Execution Resource', width: 140, render: t => t.resource || '-' },
         { id: 'cost', label: 'Cost', width: 80, render: t => t.cost ? t.cost.toLocaleString() : '-' },
         { id: 'progress', label: '%', width: 50, render: t => t.progress + '%' },
         { id: 'dependencies', label: 'Pred.', width: 70, render: t => t.dependencies?.join(',') || '' }
