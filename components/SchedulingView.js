@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { generateScheduleFromPlan } from '../services/schedulingService.js';
-import { ScheduleIcon, Spinner, BoardIcon, ListIcon, TimelineIcon, ZoomInIcon, ZoomOutIcon, FullscreenIcon, FullscreenExitIcon, ExpandIcon, CollapseIcon, EditIcon, ExportIcon, RefreshIcon, StructureIcon } from './Shared.js';
+import { ScheduleIcon, Spinner, BoardIcon, ListIcon, TimelineIcon, ZoomInIcon, ZoomOutIcon, FullscreenIcon, FullscreenExitIcon, ExpandIcon, CollapseIcon, EditIcon, ExportIcon, RefreshIcon, StructureIcon, ChevronRightIcon } from './Shared.js';
 import { i18n } from '../constants.js';
 
 // --- Helper Functions ---
@@ -48,6 +48,8 @@ const LoadingView = () => (
 
 // --- Timeline View with Synchronized Scroll ---
 const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpdate }) => {
+    const [showDetails, setShowDetails] = useState(false);
+
     // 1. Data Preparation
     const dates = useMemo(() => {
         if (!tasks.length) return { start: new Date(), end: new Date(), totalDays: 0 };
@@ -187,7 +189,20 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
     };
 
     const rowHeight = 44; 
-    const taskListWidth = 300; 
+    
+    // Column Definitions
+    const detailedColumns = [
+        { id: 'start', label: 'Start', width: 90, render: t => formatDate(t.start) },
+        { id: 'end', label: 'End', width: 90, render: t => formatDate(t.end) },
+        { id: 'resource', label: 'Resource', width: 120, render: t => t.resource || '-' },
+        { id: 'cost', label: 'Cost', width: 80, render: t => t.cost ? t.cost.toLocaleString() : '-' },
+        { id: 'progress', label: '%', width: 50, render: t => t.progress + '%' },
+        { id: 'dependencies', label: 'Pred.', width: 70, render: t => t.dependencies?.join(',') || '' }
+    ];
+
+    const nameColumnWidth = 300;
+    const totalDetailsWidth = detailedColumns.reduce((acc, col) => acc + col.width, 0);
+    const taskListWidth = showDetails ? nameColumnWidth + totalDetailsWidth : nameColumnWidth;
 
     // Dependency Lines Calculation (Orthogonal)
     const dependencyLines = useMemo(() => {
@@ -256,9 +271,34 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                 // Row 2: Days/Weeks scale
                 React.createElement('div', { className: 'flex h-9' },
                     React.createElement('div', { 
-                        className: 'sticky left-0 z-40 bg-dark-card-solid border-r border-dark-border flex items-center px-4 font-bold text-white text-sm',
+                        className: 'sticky left-0 z-40 bg-dark-card-solid border-r border-dark-border flex flex-shrink-0',
                         style: { width: taskListWidth }
-                    }, "Task Name"),
+                    },
+                        // Name Column Header
+                        React.createElement('div', { 
+                            className: 'flex items-center justify-between px-4 font-bold text-white text-sm border-r border-dark-border/30',
+                            style: { width: nameColumnWidth }
+                        }, 
+                            "Task Name",
+                            React.createElement('button', {
+                                onClick: () => setShowDetails(!showDetails),
+                                title: showDetails ? "Collapse Columns" : "Expand Details",
+                                className: "p-1 rounded hover:bg-white/10 text-brand-purple-light transition-colors"
+                            }, 
+                                showDetails 
+                                    ? React.createElement(ChevronRightIcon, { className: "w-4 h-4 transform rotate-180" }) 
+                                    : React.createElement(ChevronRightIcon, { className: "w-4 h-4" })
+                            )
+                        ),
+                        // Detailed Column Headers
+                        showDetails && detailedColumns.map(col => 
+                            React.createElement('div', {
+                                key: col.id,
+                                className: 'flex items-center px-2 text-xs font-semibold text-brand-text-light border-r border-dark-border/30 bg-dark-card-solid',
+                                style: { width: col.width }
+                            }, col.label)
+                        )
+                    ),
                     
                     periods.map((p, i) => 
                         React.createElement('div', { 
@@ -276,7 +316,10 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
             ),
 
             // --- Body Grid ---
-            React.createElement('div', { className: 'absolute top-[72px] bottom-0 left-[300px] flex pointer-events-none z-0' },
+            React.createElement('div', { 
+                className: 'absolute top-[72px] bottom-0 flex pointer-events-none z-0',
+                style: { left: taskListWidth } 
+            },
                 periods.map((p, i) => 
                     React.createElement('div', { 
                         key: i, 
@@ -286,7 +329,10 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                 )
             ),
 
-            React.createElement('svg', { className: 'absolute top-[72px] left-[300px] pointer-events-none z-10 w-full h-full' },
+            React.createElement('svg', { 
+                className: 'absolute top-[72px] pointer-events-none z-10 w-full h-full',
+                style: { left: taskListWidth }
+            },
                 dependencyLines.map(line => 
                     React.createElement('path', {
                         key: line.id,
@@ -314,18 +360,32 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                 return React.createElement('div', { key: task.id, className: `flex hover:bg-white/5 transition-colors relative group ${isSummary ? 'bg-dark-card-solid border-b border-dark-border' : ''}`, style: { height: rowHeight } },
                     
                     React.createElement('div', { 
-                        className: `sticky left-0 z-20 flex-shrink-0 border-r border-dark-border flex items-center px-4 gap-2 overflow-hidden shadow-[4px_0_10px_rgba(0,0,0,0.3)] ${isProject || isSummary ? 'bg-dark-card-solid' : 'bg-dark-card'}`,
+                        className: `sticky left-0 z-20 flex-shrink-0 border-r border-dark-border flex items-center overflow-hidden shadow-[4px_0_10px_rgba(0,0,0,0.3)] ${isProject || isSummary ? 'bg-dark-card-solid' : 'bg-dark-card'}`,
                         style: { width: taskListWidth }
                     },
-                        React.createElement('div', { style: { width: level * 16 } }), // Indentation based on robust hierarchy
-                        isProject && React.createElement('button', { 
-                            onClick: () => onToggle(task.id),
-                            className: 'p-0.5 hover:text-white text-brand-purple-light focus:outline-none'
-                        }, expanded.has(task.id) ? '▼' : '▶'),
-                        React.createElement('span', { 
-                            title: task.name,
-                            className: `truncate text-sm ${isSummary ? 'font-extrabold text-brand-purple-light uppercase' : isProject ? 'font-bold text-white' : 'font-medium text-brand-text-light'}` 
-                        }, task.name)
+                        // Name Cell
+                        React.createElement('div', { 
+                            className: 'flex items-center px-4 gap-2 h-full border-r border-dark-border/30',
+                            style: { width: nameColumnWidth }
+                        },
+                            React.createElement('div', { style: { width: level * 16 } }), // Indentation based on robust hierarchy
+                            isProject && React.createElement('button', { 
+                                onClick: () => onToggle(task.id),
+                                className: 'p-0.5 hover:text-white text-brand-purple-light focus:outline-none'
+                            }, expanded.has(task.id) ? '▼' : '▶'),
+                            React.createElement('span', { 
+                                title: task.name,
+                                className: `truncate text-sm ${isSummary ? 'font-extrabold text-brand-purple-light uppercase' : isProject ? 'font-bold text-white' : 'font-medium text-brand-text-light'}` 
+                            }, task.name)
+                        ),
+                        // Detail Cells
+                        showDetails && detailedColumns.map(col => 
+                            React.createElement('div', {
+                                key: col.id,
+                                className: `flex items-center px-2 text-xs truncate h-full border-r border-dark-border/30 ${isProject ? 'text-white font-semibold' : 'text-brand-text-light'}`,
+                                style: { width: col.width }
+                            }, col.render(task))
+                        )
                     ),
 
                     React.createElement('div', { className: 'relative flex-grow z-20 py-2' }, 
