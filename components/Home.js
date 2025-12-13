@@ -224,34 +224,39 @@ const AnimatedCityscape = () => {
 };
 
 const CreatorSection = () => (
-    React.createElement('section', { className: "py-24 bg-dark-bg" },
-        React.createElement('div', { className: "container mx-auto px-6" },
+    React.createElement('section', { className: "py-24 bg-dark-bg relative" },
+        // Subtle background glow
+        React.createElement('div', { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-brand-purple/5 rounded-full blur-[100px] pointer-events-none" }),
+        
+        React.createElement('div', { className: "container mx-auto px-6 relative z-10" },
             React.createElement('div', { className: "text-center mb-12" },
                 React.createElement('h2', { className: "text-4xl font-extrabold text-white mb-3" }, "Meet the Creator"),
-                React.createElement('p', { className: "text-slate-400 text-lg" }, "The mind behind PM Roadmap.")
+                React.createElement('p', { className: "text-brand-text-light text-lg" }, "The mind behind PM Roadmap.")
             ),
-            React.createElement('div', { className: "max-w-4xl mx-auto bg-[#0F111A] border border-slate-800 rounded-3xl p-8 md:p-12 shadow-2xl relative overflow-hidden" },
+            React.createElement('div', { className: "max-w-4xl mx-auto bg-dark-card backdrop-blur-xl border border-dark-border rounded-3xl p-8 md:p-12 shadow-2xl relative overflow-hidden glow-border" },
                 React.createElement('div', { className: "flex flex-col md:flex-row items-center gap-10" },
                     // Image Column
                     React.createElement('div', { className: "flex-shrink-0 relative" },
-                        React.createElement('div', { className: "w-48 h-48 rounded-full border-[6px] border-[#EF4444] overflow-hidden shadow-lg" },
-                            React.createElement('img', { 
-                                src: "https://i.imgur.com/NmdyAV9.jpeg", // Using user provided image
-                                alt: "Mohamed Naguib",
-                                className: "w-full h-full object-cover grayscale filter" 
-                            })
+                        // Image container with gradient border
+                        React.createElement('div', { className: "w-48 h-48 rounded-full p-1 bg-gradient-to-tr from-brand-purple to-brand-pink shadow-lg shadow-brand-purple/20" },
+                             React.createElement('div', { className: "w-full h-full rounded-full overflow-hidden bg-dark-bg" },
+                                React.createElement('img', { 
+                                    src: "https://i.imgur.com/NmdyAV9.jpeg",
+                                    alt: "Mohamed Naguib",
+                                    className: "w-full h-full object-cover filter grayscale hover:grayscale-0 transition-all duration-500" 
+                                })
+                             )
                         )
                     ),
                     // Text Column
                     React.createElement('div', { className: "text-center md:text-left" },
                         React.createElement('h3', { className: "text-3xl font-bold text-white mb-4" }, "Mohamed Naguib"),
                         React.createElement('div', { className: "flex flex-wrap justify-center md:justify-start gap-3 mb-6" },
-                            React.createElement('span', { className: "px-4 py-1.5 rounded-full bg-[#1e293b] text-[#60A5FA] text-sm font-semibold tracking-wide" }, "AI Lead"),
-                            React.createElement('span', { className: "px-4 py-1.5 rounded-full bg-[#1e293b] text-[#60A5FA] text-sm font-semibold tracking-wide" }, "UI/UX Design"),
-                            React.createElement('span', { className: "px-4 py-1.5 rounded-full bg-[#1e293b] text-[#60A5FA] text-sm font-semibold tracking-wide" }, "Automation"),
-                            React.createElement('span', { className: "px-4 py-1.5 rounded-full bg-[#1e293b] text-[#60A5FA] text-sm font-semibold tracking-wide" }, "Engineer")
+                            ['AI Lead', 'UI/UX Design', 'Automation', 'Engineer'].map(tag => 
+                                React.createElement('span', { key: tag, className: "px-4 py-1.5 rounded-full bg-dark-card-solid border border-dark-border text-brand-purple-light text-sm font-semibold tracking-wide" }, tag)
+                            )
                         ),
-                        React.createElement('p', { className: "text-slate-400 leading-relaxed text-lg" }, 
+                        React.createElement('p', { className: "text-brand-text-light leading-relaxed text-lg" }, 
                             "A passionate developer and designer with deep expertise in leading AI initiatives, crafting intuitive UI/UX, and full-stack application development. Dedicated to merging advanced technology with elegant design to empower users."
                         )
                     )
