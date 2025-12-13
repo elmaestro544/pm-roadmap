@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { i18n } from '../constants.js';
 
@@ -31,7 +30,7 @@ const About = ({ language }) => {
             React.createElement('h2', { className: "text-4xl font-extrabold text-slate-900 dark:text-brand-text" }, t.aboutTitle)
         ),
 
-        React.createElement('div', { className: "bg-white dark:bg-card-gradient p-8 rounded-2xl border border-slate-200 dark:border-white/10 space-y-6 text-lg leading-relaxed text-slate-600 dark:text-brand-text-light" },
+        React.createElement('div', { className: "bg-white dark:bg-card-gradient p-8 rounded-2xl border border-slate-200 dark:border-white/10 space-y-6 text-lg leading-relaxed text-slate-600 dark:text-brand-text-light shadow-xl" },
             React.createElement(Section, { icon: React.createElement(VisionIcon), title: t.aboutVisionTitle },
                 React.createElement('p', null, t.aboutVisionText)
             ),

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { FeatureToolbar, RefreshIcon, Spinner, ExportIcon, DocumentIcon, MaximizeIcon, CloseIcon, ExpandIcon } from './Shared.js';
 import { i18n } from '../constants.js';
 
@@ -49,7 +49,7 @@ const StackedBar = ({ segments, height = 12 }) => {
 
 // --- Mini Gantt Chart Component ---
 const MiniGantt = ({ tasks }) => {
-    if (!tasks || tasks.length === 0) return null;
+    if (!tasks || !Array.isArray(tasks) || tasks.length === 0) return null;
 
     // Filter mainly high-level tasks/phases for the overview
     let displayTasks = tasks.filter(t => t.type === 'project');
@@ -58,42 +58,50 @@ const MiniGantt = ({ tasks }) => {
     // Sort by start date
     displayTasks.sort((a, b) => new Date(a.start) - new Date(b.start));
 
-    // Determine timeline bounds
-    const startDates = displayTasks.map(t => new Date(t.start).getTime()).filter(d => !isNaN(d));
-    const endDates = displayTasks.map(t => new Date(t.end).getTime()).filter(d => !isNaN(d));
+    // Determine timeline bounds safely
+    const startDates = displayTasks
+        .map(t => new Date(t.start).getTime())
+        .filter(d => !isNaN(d));
+    const endDates = displayTasks
+        .map(t => new Date(t.end).getTime())
+        .filter(d => !isNaN(d));
     
     if (startDates.length === 0 || endDates.length === 0) return null;
 
     const minTime = Math.min(...startDates);
     const maxTime = Math.max(...endDates);
-    const totalDuration = maxTime - minTime;
+    const totalDuration = Math.max(maxTime - minTime, 1); // Avoid div by zero
 
-    return React.createElement('div', { className: 'w-full space-y-3 mt-2' },
+    return React.createElement('div', { className: 'w-full space-y-4 mt-4 h-full' },
         displayTasks.map(task => {
             const start = new Date(task.start).getTime();
             const end = new Date(task.end).getTime();
             
             if (isNaN(start) || isNaN(end)) return null;
 
-            const left = totalDuration > 0 ? ((start - minTime) / totalDuration) * 100 : 0;
-            const width = totalDuration > 0 ? ((end - start) / totalDuration) * 100 : 100;
+            const left = ((start - minTime) / totalDuration) * 100;
+            const width = ((end - start) / totalDuration) * 100;
             const isCompleted = task.progress === 100;
 
-            return React.createElement('div', { key: task.id, className: 'relative' },
+            return React.createElement('div', { key: task.id, className: 'relative group' },
                 React.createElement('div', { className: 'flex justify-between text-xs mb-1' },
-                    React.createElement('span', { className: 'text-white font-medium truncate w-32' }, task.name),
-                    React.createElement('span', { className: 'text-brand-text-light' }, `${task.progress}%`)
+                    React.createElement('span', { className: 'text-white font-medium truncate w-48' }, task.name),
+                    React.createElement('span', { className: 'text-brand-text-light font-mono' }, `${task.progress}%`)
                 ),
-                React.createElement('div', { className: 'w-full h-2 bg-dark-bg rounded-full overflow-hidden relative' },
+                React.createElement('div', { className: 'w-full h-3 bg-dark-bg rounded-full overflow-hidden relative' },
                     React.createElement('div', {
                         className: `absolute h-full rounded-full ${isCompleted ? 'bg-green-500' : 'bg-brand-purple'}`,
                         style: { left: `${left}%`, width: `${Math.max(width, 1)}%` }
                     })
+                ),
+                // Tooltip
+                 React.createElement('div', { className: 'absolute left-0 bottom-full mb-2 hidden group-hover:block z-10 bg-black text-xs text-white p-1 rounded whitespace-nowrap border border-dark-border' },
+                    `${new Date(task.start).toLocaleDateString()} - ${new Date(task.end).toLocaleDateString()}`
                 )
             );
         }),
         // Time Axis
-        React.createElement('div', { className: 'flex justify-between text-[10px] text-brand-text-light mt-2 pt-2 border-t border-dark-border' },
+        React.createElement('div', { className: 'flex justify-between text-[10px] text-brand-text-light mt-4 pt-2 border-t border-dark-border' },
             React.createElement('span', null, new Date(minTime).toLocaleDateString()),
             React.createElement('span', null, new Date(maxTime).toLocaleDateString())
         )
@@ -109,7 +117,10 @@ const DashboardWidget = ({ title, children, expandedContent, className = '', hea
         // Collapsed / Standard View
         React.createElement('div', { className: `bg-dark-card-solid print:bg-white border border-dark-border print:border-gray-300 rounded-2xl p-5 flex flex-col relative transition-all hover:border-brand-purple/30 h-full ${className}` },
             React.createElement('div', { className: 'flex justify-between items-center mb-4 flex-shrink-0' },
-                React.createElement('h3', { className: 'text-white print:text-black font-bold text-sm uppercase tracking-wide' }, title),
+                React.createElement('h3', { className: 'text-white print:text-black font-bold text-sm uppercase tracking-wide flex items-center gap-2' }, 
+                   React.createElement('span', { className: 'w-1.5 h-4 bg-brand-purple rounded-full' }),
+                   title
+                ),
                 React.createElement('div', { className: 'flex items-center gap-2' },
                     headerAction,
                     expandedContent && React.createElement('button', {
@@ -315,12 +326,27 @@ const BudgetBurndown = ({ budget, currency = 'USD', kpi }) => {
     );
 };
 
-const MilestonesWidget = ({ milestones, schedule }) => {
-    
-    // Expanded view logic (unchanged)
+const TimelineWidget = ({ schedule }) => {
+    const ExpandedView = (
+        React.createElement('div', { className: 'h-[600px] w-full' },
+            React.createElement(MiniGantt, { tasks: schedule })
+        )
+    );
+
+    return React.createElement(DashboardWidget, { title: "Project Timeline", expandedContent: ExpandedView },
+        React.createElement('div', { className: 'h-full flex flex-col justify-start overflow-y-auto' },
+             schedule && schedule.length > 0 
+                ? React.createElement(MiniGantt, { tasks: schedule })
+                : React.createElement('div', { className: 'h-32 bg-dark-bg/50 rounded-lg flex items-center justify-center text-sm text-brand-text-light border border-dark-border border-dashed' }, "No timeline data available.")
+        )
+    );
+};
+
+const MilestonesWidget = ({ milestones }) => {
+    // Expanded view logic (Full List)
     const ExpandedView = (
         React.createElement('div', { className: 'space-y-4' },
-            React.createElement('p', { className: 'text-brand-text-light' }, "Key project checkpoints and deliverables."),
+            React.createElement('p', { className: 'text-brand-text-light' }, "Complete list of project milestones."),
             milestones && milestones.length > 0 ? (
                 milestones.map((m, i) => (
                     React.createElement('div', { key: i, className: 'flex gap-4 p-4 bg-dark-bg rounded-lg border border-dark-border' },
@@ -330,11 +356,11 @@ const MilestonesWidget = ({ milestones, schedule }) => {
                         ),
                         React.createElement('div', { className: 'flex-grow' },
                             React.createElement('h4', { className: 'font-bold text-white' }, m.name),
-                            React.createElement('p', { className: 'text-sm text-brand-text-light' }, m.description || "No description provided.")
+                            React.createElement('p', { className: 'text-sm text-brand-text-light' }, m.description || "No description.")
                         ),
                         React.createElement('div', { className: 'flex-shrink-0 self-center' },
                             m.completed 
-                                ? React.createElement('span', { className: 'px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-bold' }, "Completed")
+                                ? React.createElement('span', { className: 'px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-bold' }, "Done")
                                 : React.createElement('span', { className: 'px-3 py-1 bg-slate-700 text-slate-300 rounded-full text-xs' }, "Pending")
                         )
                     )
@@ -343,14 +369,14 @@ const MilestonesWidget = ({ milestones, schedule }) => {
         )
     );
 
-    // Mini View (Top 3 upcoming)
+    // Collapsed View (Top 3)
     const upcoming = milestones ? milestones.filter(m => !m.completed).slice(0, 3) : [];
 
     return React.createElement(DashboardWidget, { title: "Key Milestones", expandedContent: ExpandedView },
-        React.createElement('div', { className: 'space-y-3' },
+        React.createElement('div', { className: 'space-y-3 h-full overflow-y-auto' },
             upcoming.length > 0 ? upcoming.map((m, i) => (
-                React.createElement('div', { key: i, className: 'flex items-center gap-3 border-l-2 border-brand-purple pl-3' },
-                    React.createElement('div', { className: 'flex-grow' },
+                React.createElement('div', { key: i, className: 'flex items-center gap-3 border-l-2 border-brand-purple pl-3 py-1' },
+                    React.createElement('div', { className: 'flex-grow min-w-0' },
                         React.createElement('p', { className: 'text-sm font-medium text-white truncate' }, m.name),
                         React.createElement('p', { className: 'text-xs text-brand-text-light' }, m.date ? new Date(m.date).toLocaleDateString() : '')
                     )
@@ -521,12 +547,13 @@ const ProjectOverview = ({ language, projectData }) => {
     const currency = projectData?.criteria?.currency || 'USD';
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [showExportMenu, setShowExportMenu] = useState(false);
-    const fullscreenRef = useRef(null); // Added ref
+    const fullscreenRef = useRef(null); 
 
     const handleRefresh = () => {
         setIsRefreshing(true);
-        // Simulate data refresh / recalculation delay
-        setTimeout(() => setIsRefreshing(false), 1500);
+        // In a real app, this would re-fetch or re-calculate.
+        // For visual feedback:
+        setTimeout(() => setIsRefreshing(false), 800);
     };
 
     // Calculate derived metrics with safety checks
@@ -534,7 +561,7 @@ const ProjectOverview = ({ language, projectData }) => {
     const progress = kpi.overallProgress || (projectData?.schedule ? 
         Math.round(projectData.schedule.reduce((acc, t) => acc + (t.progress || 0), 0) / Math.max(projectData.schedule.length, 1)) : 0);
 
-    // Extract Milestones with safety checks
+    // Extract Milestones
     const milestones = projectData?.schedule ? projectData.schedule.filter(t => t.type === 'milestone').map(m => ({
         name: m.name,
         date: m.end || m.start,
@@ -542,17 +569,29 @@ const ProjectOverview = ({ language, projectData }) => {
         description: m.description
     })) : [];
 
+    // Auto-calculate finish date if missing but we have duration
+    const computedFinishDate = useMemo(() => {
+        const crit = projectData?.criteria;
+        if (crit?.finishDate) return crit.finishDate;
+        if (crit?.startDate && crit?.duration) {
+            const start = new Date(crit.startDate);
+            // Rough calc: duration (months) * 30.44 days
+            start.setDate(start.getDate() + Math.round(parseFloat(crit.duration) * 30.44));
+            return start.toISOString().split('T')[0];
+        }
+        return '-';
+    }, [projectData?.criteria]);
+
     // Project Meta
     const projectMeta = {
         description: projectData?.objective || projectData?.consultingPlan?.scopeAndObjectives || 'No description available.',
         location: projectData?.criteria?.location,
         startDate: projectData?.criteria?.startDate,
-        finishDate: projectData?.criteria?.finishDate,
+        finishDate: computedFinishDate,
         budgetType: projectData?.criteria?.budgetType
     };
 
     const handleExportCSV = () => {
-        // Flatten data for CSV
         const rows = [
             ['Metric', 'Value'],
             ['Project Name', projectData?.consultingPlan?.projectTitle || 'Untitled'],
@@ -564,7 +603,6 @@ const ProjectOverview = ({ language, projectData }) => {
             ['Total Budget', projectData?.criteria?.budget || 'N/A']
         ];
 
-        // Add Risks if available
         if (projectData?.risk?.risks) {
             rows.push([]);
             rows.push(['RISK REGISTER', 'Severity', 'Likelihood', 'Impact']);
@@ -629,7 +667,7 @@ const ProjectOverview = ({ language, projectData }) => {
         React.createElement(FeatureToolbar, {
             title: t.dashboardOverview,
             customControls: customControls,
-            containerRef: fullscreenRef // Passed ref for fullscreen logic
+            containerRef: fullscreenRef 
         }),
         React.createElement('div', { className: 'flex-grow p-6 overflow-y-auto' },
             React.createElement('div', { className: 'max-w-7xl mx-auto' },
@@ -664,20 +702,12 @@ const ProjectOverview = ({ language, projectData }) => {
                         React.createElement(ResourceHeatmap, { schedule: projectData?.schedule })
                     ),
 
-                    // Row 3: Timeline & Milestones
-                    React.createElement('div', { className: 'md:col-span-3 lg:col-span-4 bg-dark-card-solid border border-dark-border rounded-2xl p-6' },
-                        React.createElement('h3', { className: 'text-white font-bold mb-4 flex items-center gap-2' }, 
-                            React.createElement('span', { className: 'w-2 h-6 bg-brand-cyan rounded-full' }),
-                            "Project Timeline & Milestones"
-                        ),
-                        React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-6' },
-                            React.createElement('div', { className: 'md:col-span-2' },
-                                React.createElement(MiniGantt, { tasks: projectData?.schedule })
-                            ),
-                            React.createElement('div', { className: 'md:col-span-1 h-full' },
-                                React.createElement(MilestonesWidget, { milestones, schedule: projectData?.schedule })
-                            )
-                        )
+                    // Row 3: Timeline & Milestones (Re-separated for cleanliness)
+                    React.createElement('div', { className: 'md:col-span-2 lg:col-span-3' },
+                        React.createElement(TimelineWidget, { schedule: projectData?.schedule })
+                    ),
+                    React.createElement('div', { className: 'md:col-span-1 lg:col-span-1' },
+                        React.createElement(MilestonesWidget, { milestones, schedule: projectData?.schedule })
                     )
                 )
             )

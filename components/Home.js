@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useState, useEffect } from 'react';
 import { i18n, AppView } from '../constants.js';
 import { PlanningIcon, RiskIcon, BudgetIcon, ScheduleIcon, CheckIcon, CloseIcon } from './Shared.js';
@@ -226,6 +223,42 @@ const AnimatedCityscape = () => {
     );
 };
 
+const CreatorSection = () => (
+    React.createElement('section', { className: "py-24 bg-dark-bg" },
+        React.createElement('div', { className: "container mx-auto px-6" },
+            React.createElement('div', { className: "text-center mb-12" },
+                React.createElement('h2', { className: "text-4xl font-extrabold text-white mb-3" }, "Meet the Creator"),
+                React.createElement('p', { className: "text-slate-400 text-lg" }, "The mind behind SciGenius.")
+            ),
+            React.createElement('div', { className: "max-w-4xl mx-auto bg-[#0F111A] border border-slate-800 rounded-3xl p-8 md:p-12 shadow-2xl relative overflow-hidden" },
+                React.createElement('div', { className: "flex flex-col md:flex-row items-center gap-10" },
+                    // Image Column
+                    React.createElement('div', { className: "flex-shrink-0 relative" },
+                        React.createElement('div', { className: "w-48 h-48 rounded-full border-[6px] border-[#EF4444] overflow-hidden shadow-lg" },
+                            React.createElement('img', { 
+                                src: "https://i.imgur.com/NmdyAV9.jpeg", // Placeholder
+                                alt: "Mohamed Naguib",
+                                className: "w-full h-full object-cover grayscale filter" 
+                            })
+                        )
+                    ),
+                    // Text Column
+                    React.createElement('div', { className: "text-center md:text-left" },
+                        React.createElement('h3', { className: "text-3xl font-bold text-white mb-4" }, "Mohamed Naguib"),
+                        React.createElement('div', { className: "flex flex-wrap justify-center md:justify-start gap-3 mb-6" },
+                            React.createElement('span', { className: "px-4 py-1.5 rounded-full bg-[#1e293b] text-[#60A5FA] text-sm font-semibold tracking-wide" }, "AI Lead"),
+                            React.createElement('span', { className: "px-4 py-1.5 rounded-full bg-[#1e293b] text-[#60A5FA] text-sm font-semibold tracking-wide" }, "UI/UX Design"),
+                            React.createElement('span', { className: "px-4 py-1.5 rounded-full bg-[#1e293b] text-[#60A5FA] text-sm font-semibold tracking-wide" }, "App Development")
+                        ),
+                        React.createElement('p', { className: "text-slate-400 leading-relaxed text-lg" }, 
+                            "A passionate developer and designer with deep expertise in leading AI initiatives, crafting intuitive UI/UX, and full-stack application development. Dedicated to merging advanced technology with elegant design to empower users."
+                        )
+                    )
+                )
+            )
+        )
+    )
+);
 
 const Home = ({ language, setView, settings }) => {
     const t = i18n[language];
@@ -446,7 +479,8 @@ const Home = ({ language, setView, settings }) => {
         React.createElement(FeatureModal, { feature: activeFeature, onClose: () => setActiveFeature(null), language: language }),
         React.createElement(HeroSection, null),
         React.createElement(CapabilitiesSection, null),
-        React.createElement(IndustriesSection, null)
+        React.createElement(IndustriesSection, null),
+        React.createElement(CreatorSection, null)
     );
 };
 
