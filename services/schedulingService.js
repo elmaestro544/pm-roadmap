@@ -23,6 +23,278 @@ const ganttChartSchema = {
     }
 };
 
+// --- Helper: Date Arithmetic ---
+const addDays = (dateStr, days) => {
+    const d = new Date(dateStr);
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split('T')[0];
+};
+
+const getDayDiff = (d1Str, d2Str) => {
+    const d1 = new Date(d1Str);
+    const d2 = new Date(d2Str);
+    return Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+};
+
+// --- CPM Logic ---
+export const calculateCriticalPath = (tasks) => {
+    // 1. Map for easy access
+    const taskMap = new Map();
+    // Filter out summary tasks for calculation, or handle them gently. 
+    // CPM is usually best run on leaf nodes, but we'll include all to calculate float.
+    tasks.forEach(t => taskMap.set(t.id, { ...t, duration: getDayDiff(t.start, t.end), es: 0, ef: 0, ls: 0, lf: 0, float: 0, successors: [] }));
+
+    // 2. Build Graph (Successors)
+    tasks.forEach(t => {
+        if (t.dependencies) {
+            t.dependencies.forEach(depId => {
+                const pred = taskMap.get(depId);
+                if (pred) pred.successors.push(t.id);
+            });
+        }
+    });
+
+    const sortedIds = Array.from(taskMap.keys()); // Topological sort ideally, but simple iteration often works for DAGs if we multi-pass or recursive.
+    
+    // 3. Forward Pass (Early Start / Early Finish)
+    // We need to traverse based on dependencies. 
+    const visitedForward = new Set();
+    const calcForward = (taskId) => {
+        if (visitedForward.has(taskId)) return;
+        visitedForward.add(taskId);
+
+        const task = taskMap.get(taskId);
+        
+        let maxPredEf = 0; // Default start relative 0
+        if (task.dependencies && task.dependencies.length > 0) {
+            task.dependencies.forEach(depId => {
+                if (!visitedForward.has(depId)) calcForward(depId);
+                const pred = taskMap.get(depId);
+                if (pred && pred.ef > maxPredEf) maxPredEf = pred.ef;
+            });
+        }
+        
+        task.es = maxPredEf;
+        task.ef = task.es + Math.max(1, task.duration); // Min duration 1 day
+    };
+
+    tasks.forEach(t => calcForward(t.id));
+    
+    // Project Duration
+    const projectDuration = Math.max(...Array.from(taskMap.values()).map(t => t.ef));
+
+    // 4. Backward Pass (Late Start / Late Finish)
+    const visitedBackward = new Set();
+    const calcBackward = (taskId) => {
+        if (visitedBackward.has(taskId)) return;
+        visitedBackward.add(taskId);
+
+        const task = taskMap.get(taskId);
+        
+        let minSuccLs = projectDuration;
+        
+        if (task.successors.length > 0) {
+            task.successors.forEach(succId => {
+                if (!visitedBackward.has(succId)) calcBackward(succId);
+                const succ = taskMap.get(succId);
+                if (succ && succ.ls < minSuccLs) minSuccLs = succ.ls;
+            });
+            task.lf = minSuccLs;
+        } else {
+            // If no successors, LF is project finish
+            task.lf = projectDuration;
+        }
+        
+        task.ls = task.lf - Math.max(1, task.duration);
+        task.float = task.ls - task.es;
+    };
+
+    // Start backward pass from end tasks (no successors) or all tasks
+    tasks.forEach(t => calcBackward(t.id));
+
+    // 5. Mark Critical and Return
+    return tasks.map(t => {
+        const calculated = taskMap.get(t.id);
+        // Float close to 0 (allow small margin for float rounding)
+        const isCritical = calculated.float <= 0; 
+        return { ...t, isCritical };
+    });
+};
+
+// --- Corrective Actions ---
+export const applyCorrectiveAction = (tasks, type) => {
+    // Re-run CPM to ensure we are targeting current critical path
+    const analyzedTasks = calculateCriticalPath(tasks);
+    const criticalTasks = analyzedTasks.filter(t => t.isCritical && t.type === 'task');
+
+    if (criticalTasks.length === 0) return analyzedTasks;
+
+    // Helper to get numeric cost
+    const getCost = (t) => t.cost || 0;
+
+    let modifiedTasks = [...analyzedTasks];
+
+    if (type === 'crash') {
+        // CRASHING: Reduce duration of critical tasks, increase cost.
+        // Heuristic: Crash the critical tasks with the longest duration first (usually easiest to trim).
+        criticalTasks.sort((a, b) => getDayDiff(b.start, b.end) - getDayDiff(a.start, a.end));
+        
+        // Crash top 30% of critical tasks
+        const tasksToCrash = criticalTasks.slice(0, Math.ceil(criticalTasks.length * 0.3));
+        
+        modifiedTasks = modifiedTasks.map(t => {
+            if (tasksToCrash.find(c => c.id === t.id)) {
+                const currentDuration = getDayDiff(t.start, t.end);
+                if (currentDuration > 1) {
+                    const newDuration = Math.floor(currentDuration * 0.75); // Reduce by 25%
+                    const daysRemoved = currentDuration - newDuration;
+                    
+                    // Cost increase (Crashing cost): e.g., 20% increase for 25% time savings
+                    const newCost = getCost(t) * 1.2;
+                    
+                    // Adjust End Date
+                    const newEnd = addDays(t.start, newDuration);
+                    
+                    return { ...t, end: newEnd, cost: newCost, name: `${t.name} (Crashed)` };
+                }
+            }
+            return t;
+        });
+    } 
+    else if (type === 'fast-track') {
+        // FAST-TRACKING: Overlap critical tasks.
+        // Find critical tasks that depend on other critical tasks
+        const criticalIds = new Set(criticalTasks.map(t => t.id));
+        
+        modifiedTasks = modifiedTasks.map(t => {
+            if (criticalIds.has(t.id) && t.dependencies?.length > 0) {
+                // If it depends on another critical task, pull start date back
+                const hasCriticalPred = t.dependencies.some(d => criticalIds.has(d));
+                if (hasCriticalPred) {
+                    const currentStart = new Date(t.start);
+                    const currentEnd = new Date(t.end);
+                    const duration = getDayDiff(t.start, t.end);
+                    
+                    // Overlap by 20% of duration
+                    const shiftDays = Math.ceil(duration * 0.2); 
+                    
+                    const newStart = addDays(t.start, -shiftDays);
+                    const newEnd = addDays(t.end, -shiftDays);
+                    
+                    return { ...t, start: newStart, end: newEnd, name: `${t.name} (Fast-Tracked)` };
+                }
+            }
+            return t;
+        });
+    }
+
+    // After modifying durations/dates, we need to ripple the changes through the schedule
+    // This is a complex operation (Rescheduling). 
+    // For this prototype, we will return the Modified tasks and assume the Visualizer connects lines based on ID.
+    // However, to be accurate, we should ideally re-run a forward pass to adjust dates of successors.
+    // Simplifying: The user sees the specific changes, and we mark them.
+    
+    // Recalculate rollup to update costs/progress of parent containers
+    const scheduled = calculateCriticalPath(modifiedTasks);
+    return recalculateScheduleHierarchy(scheduled);
+};
+
+// --- Hierarchy Rollup Logic ---
+export const recalculateScheduleHierarchy = (flatTasks) => {
+    // 1. Create a map for quick lookups and deep cloning to avoid direct mutation issues during traversal
+    const taskMap = new Map();
+    flatTasks.forEach(t => taskMap.set(t.id, { ...t }));
+
+    // 2. Build Parent -> Children map
+    const childrenMap = new Map();
+    flatTasks.forEach(t => {
+        // 'project' field holds the parent ID
+        if(t.project && t.project !== 'root' && t.project !== t.id) {
+            if(!childrenMap.has(t.project)) childrenMap.set(t.project, []);
+            childrenMap.get(t.project).push(t.id);
+        }
+    });
+
+    // 3. Process Logic: Depth-First Search (Post-Order Traversal)
+    // This ensures we calculate children before parents
+    const processedIds = new Set();
+
+    const processNode = (taskId) => {
+        if (processedIds.has(taskId)) return taskMap.get(taskId);
+        
+        const childrenIds = childrenMap.get(taskId) || [];
+        
+        // If leaf node (task/milestone), return as is
+        if (childrenIds.length === 0) {
+            processedIds.add(taskId);
+            return taskMap.get(taskId);
+        }
+
+        // Process children first
+        let totalCost = 0;
+        let weightedProgressSum = 0;
+        let totalProgressSimple = 0;
+        let activeChildCount = 0;
+        let startDateTimes = [];
+        let endDateTimes = [];
+
+        const processedChildren = childrenIds.map(childId => processNode(childId));
+
+        processedChildren.forEach(child => {
+            // Cost Summation
+            const cost = child.cost || 0;
+            const prog = child.progress || 0;
+            
+            // Logic: Only Tasks contribute to weight, projects are containers
+            // But since this is recursive, a sub-project's cost is the sum of its tasks
+            totalCost += cost;
+            
+            // Weighted Progress Accumulation
+            weightedProgressSum += (prog * cost);
+            totalProgressSimple += prog;
+            activeChildCount++;
+            
+            // Date Rollup (Min/Max)
+            if(child.start) startDateTimes.push(new Date(child.start).getTime());
+            if(child.end) endDateTimes.push(new Date(child.end).getTime());
+        });
+
+        const node = taskMap.get(taskId);
+        
+        // Update Cost (Summation)
+        node.cost = totalCost;
+
+        // Update Progress (Weighted by Cost)
+        if (totalCost > 0) {
+            node.progress = Math.round(weightedProgressSum / totalCost);
+        } else if (activeChildCount > 0) {
+            // Fallback if no cost assigned (simple average)
+            node.progress = Math.round(totalProgressSimple / activeChildCount);
+        } else {
+            node.progress = 0;
+        }
+
+        // Update Dates (Rollup)
+        if (startDateTimes.length) {
+            node.start = new Date(Math.min(...startDateTimes)).toISOString().split('T')[0];
+        }
+        if (endDateTimes.length) {
+            node.end = new Date(Math.max(...endDateTimes)).toISOString().split('T')[0];
+        }
+
+        processedIds.add(taskId);
+        return node;
+    };
+
+    // Trigger processing for all nodes. 
+    // Since processNode is memoized with processedIds, calling it on every node is safe/efficient.
+    flatTasks.forEach(t => processNode(t.id));
+
+    // Return the updated tasks in original order
+    return flatTasks.map(t => taskMap.get(t.id));
+};
+
+
 export const generateScheduleFromPlan = async (projectPlan, criteria) => {
     // Determine Project Start Date
     let projectStartDate;
@@ -123,60 +395,31 @@ export const generateScheduleFromPlan = async (projectPlan, criteria) => {
             }
         });
 
-        // 5. Bottom-Up Rollup (Cost, Dates, Progress)
-        // We use a map for quick access
+        // 5. Initial Rollup (Cost, Dates, Progress) using the new centralized logic
+        scheduleData = recalculateScheduleHierarchy(scheduleData);
+
+        // 6. Force Project Parameters on Root Node (Override AI if strict parameters exist)
+        const updatedRoot = scheduleData.find(t => t.id === rootId);
+        if (updatedRoot) {
+            if (criteria?.startDate) updatedRoot.start = criteria.startDate;
+            if (criteria?.finishDate) updatedRoot.end = criteria.finishDate;
+        }
+        
+        // 7. Flatten for Table/Gantt (Depth calculation)
         const itemMap = new Map(scheduleData.map(t => [t.id, t]));
-        // Build children map
         const childrenMap = new Map();
         scheduleData.forEach(t => {
-            if (t.project && t.id !== rootId) { // Avoid self-ref
+            if (t.project && t.id !== rootId) { 
                 if (!childrenMap.has(t.project)) childrenMap.set(t.project, []);
                 childrenMap.get(t.project).push(t);
             }
         });
 
-        // DFS Post-Order for Rollup
-        const processRollup = (nodeId, visited = new Set()) => {
-            if (visited.has(nodeId)) return; // Cycle detection
-            visited.add(nodeId);
-
-            const node = itemMap.get(nodeId);
-            if (!node) return;
-
-            const children = childrenMap.get(nodeId) || [];
-            
-            // Process children first (Bottom-Up)
-            children.forEach(child => processRollup(child.id, visited));
-
-            // If node is a container (project) or root, aggregate values from children
-            if (node.type === 'project' || node.id === rootId) {
-                if (children.length > 0) {
-                    // Sum Cost (Ensures we don't count the group itself + children)
-                    node.cost = children.reduce((sum, c) => sum + (c.cost || 0), 0);
-                    
-                    // Average Progress (Simple weight)
-                    node.progress = Math.round(children.reduce((sum, c) => sum + (c.progress || 0), 0) / children.length);
-                    
-                    // Min Start
-                    const cStarts = children.map(c => new Date(c.start).getTime()).filter(t => !isNaN(t));
-                    if (cStarts.length) node.start = new Date(Math.min(...cStarts)).toISOString().split('T')[0];
-                    
-                    // Max End
-                    const cEnds = children.map(c => new Date(c.end).getTime()).filter(t => !isNaN(t));
-                    if (cEnds.length) node.end = new Date(Math.max(...cEnds)).toISOString().split('T')[0];
-                }
-            }
-        };
-
-        processRollup(rootId);
-
-        // 6. Force Project Parameters on Root Node (Override AI if strict parameters exist)
-        if (criteria?.startDate) rootNode.start = criteria.startDate;
-        if (criteria?.finishDate) rootNode.end = criteria.finishDate;
-        
-        // 7. Flatten for Table/Gantt (Depth calculation)
         const hierarchy = [];
         const visitedDFS = new Set();
+
+        // Get fresh reference to root
+        const freshRoot = itemMap.get(rootId);
 
         const buildFlatHierarchy = (node, level) => {
             if (visitedDFS.has(node.id)) return;
@@ -186,7 +429,6 @@ export const generateScheduleFromPlan = async (projectPlan, criteria) => {
 
             const children = childrenMap.get(node.id) || [];
             // Sort: Projects/Phases first, then by Start Date
-            // This fixes the "sorting not correct" issue by enforcing structure first
             children.sort((a, b) => {
                 // Priority 1: ID sequence (if numeric/alphanumeric)
                 const aId = parseFloat(a.id);
@@ -203,9 +445,12 @@ export const generateScheduleFromPlan = async (projectPlan, criteria) => {
             children.forEach(child => buildFlatHierarchy(child, level + 1));
         };
 
-        buildFlatHierarchy(rootNode, 0);
+        buildFlatHierarchy(freshRoot, 0);
 
-        return hierarchy;
+        // 8. FINAL STEP: Calculate Critical Path
+        const finalSchedule = calculateCriticalPath(hierarchy);
+
+        return finalSchedule;
 
     } catch (error) {
         console.error("Error generating project schedule:", error);

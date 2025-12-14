@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { generateScheduleFromPlan } from '../services/schedulingService.js';
-import { ScheduleIcon, Spinner, BoardIcon, ListIcon, TimelineIcon, ZoomInIcon, ZoomOutIcon, FullscreenIcon, FullscreenExitIcon, ExpandIcon, CollapseIcon, EditIcon, ExportIcon, RefreshIcon, StructureIcon, ChevronRightIcon } from './Shared.js';
+import { generateScheduleFromPlan, applyCorrectiveAction, recalculateScheduleHierarchy } from '../services/schedulingService.js';
+import { ScheduleIcon, Spinner, BoardIcon, ListIcon, TimelineIcon, ZoomInIcon, ZoomOutIcon, FullscreenIcon, FullscreenExitIcon, ExpandIcon, CollapseIcon, EditIcon, ExportIcon, RefreshIcon, StructureIcon, ChevronRightIcon, RiskIcon } from './Shared.js';
 import { i18n } from '../constants.js';
 
 // --- Helper Functions ---
@@ -47,7 +47,7 @@ const LoadingView = () => (
 );
 
 // --- Timeline View with Synchronized Scroll ---
-const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpdate, sortMode }) => {
+const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpdate, sortMode, showCriticalPath }) => {
     const [showDetails, setShowDetails] = useState(false);
 
     // 1. Data Preparation
@@ -150,7 +150,22 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
             sorted = tasks.filter(t => t.type !== 'project' && t.id !== 'ROOT-SUMMARY')
                           .sort((a, b) => (a.resource || '').localeCompare(b.resource || ''));
         } 
-        // else sortMode === 'wbs' (Default hierarchical)
+        
+        // Critical Path Filtering
+        if (showCriticalPath) {
+            // Include critical tasks AND their parents to maintain hierarchy context if in WBS mode
+            const criticalIds = new Set(tasks.filter(t => t.isCritical).map(t => t.id));
+            if (sortMode === 'wbs') {
+                sorted = tasks.filter(t => {
+                    if (t.isCritical) return true;
+                    // If it's a project/group, show it only if it has critical children (simplified: show all projects if expanded, or just filter strictly)
+                    // For simplicity in filter mode: Show only items marked critical or Top Level
+                    return t.id === 'ROOT-SUMMARY';
+                });
+            } else {
+                sorted = sorted.filter(t => t.isCritical);
+            }
+        }
 
         let colorIndex = 0;
         
@@ -174,8 +189,12 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                 }
                 
                 if (visible) {
-                    taskWithColor.color = ACTIVITY_COLORS[colorIndex % ACTIVITY_COLORS.length];
-                    colorIndex++;
+                    if (task.isCritical) {
+                        taskWithColor.color = '#EF4444'; // Red for Critical
+                    } else {
+                        taskWithColor.color = ACTIVITY_COLORS[colorIndex % ACTIVITY_COLORS.length];
+                        colorIndex++;
+                    }
                 } else {
                     return; // Skip hidden task
                 }
@@ -185,7 +204,7 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
             result.push(taskWithColor);
         });
         return result;
-    }, [tasks, expanded, sortMode]);
+    }, [tasks, expanded, sortMode, showCriticalPath]);
 
     const getLeftPos = (dateStr) => {
         const date = new Date(dateStr);
@@ -250,6 +269,11 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                         
                         const midX = x1 + 10;
                         
+                        // Highlight line if part of critical path
+                        const isCrit = task.isCritical && predTask.isCritical;
+                        const strokeColor = isCrit ? '#EF4444' : '#94A3B8';
+                        const strokeWidth = isCrit ? '2' : '1.5';
+
                         let d = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
                         
                         if (midX > x2) {
@@ -259,7 +283,9 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
 
                         lines.push({ 
                             id: `${depId}-${task.id}`,
-                            d: d
+                            d: d,
+                            color: strokeColor,
+                            width: strokeWidth
                         });
                     }
                 });
@@ -358,14 +384,17 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                         key: line.id,
                         d: line.d,
                         fill: "none",
-                        stroke: "#94A3B8", 
-                        strokeWidth: "1.5",
-                        markerEnd: "url(#arrowhead)"
+                        stroke: line.color, 
+                        strokeWidth: line.width,
+                        markerEnd: `url(#arrowhead-${line.color.replace('#','')})`
                     })
                 ),
                 React.createElement('defs', null,
-                    React.createElement('marker', { id: "arrowhead", markerWidth: "6", markerHeight: "6", refX: "5", refY: "3", orient: "auto" },
+                    React.createElement('marker', { id: "arrowhead-94A3B8", markerWidth: "6", markerHeight: "6", refX: "5", refY: "3", orient: "auto" },
                         React.createElement('path', { d: "M0,0 L0,6 L6,3 z", fill: "#94A3B8" })
+                    ),
+                    React.createElement('marker', { id: "arrowhead-EF4444", markerWidth: "6", markerHeight: "6", refX: "5", refY: "3", orient: "auto" },
+                        React.createElement('path', { d: "M0,0 L0,6 L6,3 z", fill: "#EF4444" })
                     )
                 )
             ),
@@ -411,7 +440,7 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
 
                     React.createElement('div', { className: 'relative flex-grow z-20 py-2' }, 
                         React.createElement('div', {
-                            className: `absolute top-1/2 -translate-y-1/2 h-6 rounded shadow-md text-[10px] text-white whitespace-nowrap overflow-visible flex items-center cursor-pointer transition-all hover:brightness-110`,
+                            className: `absolute top-1/2 -translate-y-1/2 h-6 rounded shadow-md text-[10px] text-white whitespace-nowrap overflow-visible flex items-center cursor-pointer transition-all hover:brightness-110 ${task.isCritical && !isProject ? 'ring-2 ring-red-500/50' : ''}`,
                             style: { 
                                 left: left, 
                                 width: width,
@@ -456,8 +485,11 @@ const BoardView = ({ tasks }) => {
                 ),
                 React.createElement('div', { className: 'flex-grow overflow-y-auto p-3 space-y-3' },
                     colTasks.map(task => 
-                        React.createElement('div', { key: task.id, className: 'bg-dark-card p-4 rounded-lg border border-dark-border shadow-sm hover:border-brand-purple/50 transition-colors group cursor-pointer' },
-                            React.createElement('p', { className: 'font-semibold text-white text-sm mb-2 group-hover:text-brand-purple-light transition-colors' }, task.name),
+                        React.createElement('div', { key: task.id, className: `bg-dark-card p-4 rounded-lg border shadow-sm hover:border-brand-purple/50 transition-colors group cursor-pointer ${task.isCritical ? 'border-red-500/50' : 'border-dark-border'}` },
+                            React.createElement('div', { className: 'flex justify-between items-start mb-2' },
+                                React.createElement('p', { className: 'font-semibold text-white text-sm group-hover:text-brand-purple-light transition-colors' }, task.name),
+                                task.isCritical && React.createElement('span', { className: 'bg-red-500/20 text-red-400 text-[10px] px-1.5 py-0.5 rounded uppercase font-bold' }, "CRIT")
+                            ),
                             React.createElement('div', { className: 'text-xs text-brand-text-light mb-2' },
                                 React.createElement('span', { className: "block" }, `Resource: ${task.resource || '-'}`),
                                 task.cost && React.createElement('span', { className: "block" }, `Cost: $${task.cost.toLocaleString()}`)
@@ -482,19 +514,24 @@ const BoardView = ({ tasks }) => {
     );
 };
 
-const EditableListView = ({ tasks, onUpdate, currency, groupBy }) => {
+const EditableListView = ({ tasks, onUpdate, currency, groupBy, showCriticalPath }) => {
     // Process data based on grouping
     const displayData = useMemo(() => {
+        let filteredTasks = tasks;
+        if (showCriticalPath) {
+            filteredTasks = tasks.filter(t => t.isCritical || t.id === 'ROOT-SUMMARY');
+        }
+
         if (groupBy === 'wbs') {
             // Tasks already sorted hierarchically by service, preserving that order.
             // Just map to include 'isHeader' false for all, indentation handled by renderer
-            return tasks.map(t => ({ ...t, isHeader: false, depth: t.level || 0 }));
+            return filteredTasks.map(t => ({ ...t, isHeader: false, depth: t.level || 0 }));
         } else {
             // Group by Field (Resource, Status)
             const groups = {};
             const result = [];
             
-            tasks.forEach(task => {
+            filteredTasks.forEach(task => {
                 if (task.type === 'project' && task.id === 'ROOT-SUMMARY') return; // Skip root summary in categorical grouping
                 
                 let key = 'Unassigned';
@@ -525,7 +562,7 @@ const EditableListView = ({ tasks, onUpdate, currency, groupBy }) => {
             
             return result;
         }
-    }, [tasks, groupBy]);
+    }, [tasks, groupBy, showCriticalPath]);
 
     return React.createElement('div', { className: 'h-full overflow-auto bg-dark-card rounded-xl border border-dark-border print:bg-white print:border-gray-300' },
         React.createElement('table', { className: 'w-full text-left text-sm' },
@@ -553,13 +590,13 @@ const EditableListView = ({ tasks, onUpdate, currency, groupBy }) => {
                             )
                         )
                     ) : (
-                        React.createElement('tr', { key: task.id, className: 'hover:bg-white/5 print:text-black' },
+                        React.createElement('tr', { key: task.id, className: `hover:bg-white/5 print:text-black ${task.isCritical ? 'bg-red-500/5' : ''}` },
                             React.createElement('td', { className: 'p-4' },
                                 React.createElement('div', { style: { paddingLeft: groupBy === 'wbs' ? `${task.depth * 20}px` : '20px' } },
                                     React.createElement('input', {
                                         value: task.name,
                                         onChange: (e) => onUpdate(task.id, 'name', e.target.value),
-                                        className: `bg-transparent w-full outline-none print:text-black focus:border-b focus:border-brand-purple ${task.type === 'project' ? 'font-bold text-white' : 'text-slate-200'}`
+                                        className: `bg-transparent w-full outline-none print:text-black focus:border-b focus:border-brand-purple ${task.type === 'project' ? 'font-bold text-white' : task.isCritical ? 'text-red-400 font-medium' : 'text-slate-200'}`
                                     })
                                 )
                             ),
@@ -592,7 +629,9 @@ const EditableListView = ({ tasks, onUpdate, currency, groupBy }) => {
                                     type: "number",
                                     value: task.cost || 0,
                                     onChange: (e) => onUpdate(task.id, 'cost', parseFloat(e.target.value)),
-                                    className: "bg-transparent w-24 outline-none text-slate-200 print:text-black"
+                                    // Disable cost editing for WBS/Summary items as they are calculated rollups
+                                    disabled: task.type === 'project' || task.id === 'ROOT-SUMMARY',
+                                    className: `bg-transparent w-24 outline-none print:text-black ${task.type === 'project' ? 'opacity-50 cursor-not-allowed font-semibold text-white' : 'text-slate-200'}`
                                 })
                             ),
                             React.createElement('td', { className: 'p-4' },
@@ -601,7 +640,9 @@ const EditableListView = ({ tasks, onUpdate, currency, groupBy }) => {
                                         type: 'range', min: 0, max: 100,
                                         value: task.progress,
                                         onChange: (e) => onUpdate(task.id, 'progress', parseInt(e.target.value)),
-                                        className: "w-16 h-1.5 bg-dark-bg rounded-lg appearance-none cursor-pointer accent-brand-purple"
+                                        // Disable progress editing for WBS/Summary items
+                                        disabled: task.type === 'project' || task.id === 'ROOT-SUMMARY',
+                                        className: `w-16 h-1.5 bg-dark-bg rounded-lg appearance-none cursor-pointer accent-brand-purple ${task.type === 'project' ? 'opacity-50 cursor-not-allowed' : ''}`
                                     }),
                                     React.createElement('span', { className: 'w-8 text-right text-slate-200' }, `${task.progress}%`)
                                  )
@@ -634,6 +675,8 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
     const [isEditing, setIsEditing] = useState(false);
     const [expanded, setExpanded] = useState(new Set());
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showCriticalPath, setShowCriticalPath] = useState(false);
+    const [optimizationAction, setOptimizationAction] = useState('none');
 
     const generate = async () => {
         try {
@@ -661,10 +704,25 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
     }, [projectData.plan, projectData.schedule, projectData.criteria, isLoading]);
 
     const handleUpdateTask = (id, field, value) => {
-        const updatedSchedule = projectData.schedule.map(t => 
+        const currentSchedule = projectData.schedule || [];
+        // 1. Update the specific task in the array
+        const updatedTaskArray = currentSchedule.map(t => 
             t.id === id ? { ...t, [field]: value } : t
         );
-        onUpdateProject({ schedule: updatedSchedule });
+        
+        // 2. Recalculate Rollups (Bottom-Up) for Cost and Progress
+        // This ensures WBS parent items reflect the changes immediately
+        const recalculatedSchedule = recalculateScheduleHierarchy(updatedTaskArray);
+
+        onUpdateProject({ schedule: recalculatedSchedule });
+    };
+
+    const handleOptimize = (action) => {
+        if (!projectData.schedule) return;
+        const optimizedSchedule = applyCorrectiveAction(projectData.schedule, action);
+        onUpdateProject({ schedule: optimizedSchedule });
+        setOptimizationAction('none'); // Reset dropdown
+        setShowCriticalPath(true); // Show critical path so user sees changes
     };
 
     const toggleExpand = (id) => {
@@ -712,7 +770,8 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                     tasks: projectData.schedule, 
                     onUpdate: handleUpdateTask,
                     currency: projectData.criteria?.currency || 'USD',
-                    groupBy
+                    groupBy,
+                    showCriticalPath
                 });
             case 'board':
                 return React.createElement(BoardView, { tasks: projectData.schedule });
@@ -725,15 +784,16 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                     zoom,
                     isEditing,
                     onUpdate: handleUpdateTask,
-                    sortMode: sortMode // Pass sort mode
+                    sortMode: sortMode,
+                    showCriticalPath
                 });
         }
     };
     
-    const IconButton = ({ icon, onClick, tooltip, active }) => (
+    const IconButton = ({ icon, onClick, tooltip, active, className='' }) => (
         React.createElement('button', {
             onClick, title: tooltip,
-            className: `p-2 rounded-md transition-colors ${active ? 'bg-brand-purple text-white' : 'text-brand-text-light hover:bg-white/10 hover:text-white'}`
+            className: `p-2 rounded-md transition-colors ${active ? 'bg-brand-purple text-white' : 'text-brand-text-light hover:bg-white/10 hover:text-white'} ${className}`
         }, icon)
     );
 
@@ -801,6 +861,28 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
              
              // Right: Tools
              React.createElement('div', { className: 'flex items-center gap-2' },
+                
+                // Critical Path Toggle
+                React.createElement('button', {
+                    onClick: () => setShowCriticalPath(!showCriticalPath),
+                    className: `flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold border transition-colors ${showCriticalPath ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-dark-card border-dark-border text-brand-text-light hover:bg-white/5'}`
+                }, 
+                    React.createElement(StructureIcon, { className: "w-3 h-3" }),
+                    "Critical Path"
+                ),
+
+                // Corrective Actions Dropdown
+                React.createElement('div', { className: 'relative group' },
+                    React.createElement('button', { className: 'flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold bg-dark-card border border-dark-border text-brand-text-light hover:bg-white/5' },
+                        React.createElement(RiskIcon, { className: "w-3 h-3" }),
+                        "Optimize"
+                    ),
+                    React.createElement('div', { className: 'absolute right-0 top-full mt-2 w-40 bg-dark-card-solid border border-dark-border rounded-lg shadow-xl z-50 hidden group-hover:block animate-fade-in-up' },
+                        React.createElement('button', { onClick: () => handleOptimize('crash'), className: 'w-full text-left px-4 py-2 text-xs hover:bg-white/10 text-white' }, "Crash Schedule (Cost++)"),
+                        React.createElement('button', { onClick: () => handleOptimize('fast-track'), className: 'w-full text-left px-4 py-2 text-xs hover:bg-white/10 text-white' }, "Fast-Track (Risk++)")
+                    )
+                ),
+
                 viewMode === 'timeline' && React.createElement(React.Fragment, null,
                     React.createElement('div', { className: 'w-px h-6 bg-dark-border mx-1' }),
                     React.createElement(IconButton, { icon: React.createElement(ZoomOutIcon), onClick: () => setZoom(z => Math.max(z - 0.2, 0.5)), tooltip: "Zoom Out" }),
