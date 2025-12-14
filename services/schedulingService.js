@@ -4,7 +4,7 @@ import { generateAIContent } from "./geminiService.js";
 
 const ganttChartSchema = {
     type: Type.ARRAY,
-    description: "An array of tasks representing a project schedule with cost and resources.",
+    description: "An array of tasks representing a project schedule with cost and RBS resources.",
     items: {
         type: Type.OBJECT,
         properties: {
@@ -13,11 +13,11 @@ const ganttChartSchema = {
             start: { type: Type.STRING, description: "YYYY-MM-DD" },
             end: { type: Type.STRING, description: "YYYY-MM-DD" },
             progress: { type: Type.NUMBER },
-            type: { type: Type.STRING, description: "'project', 'task', or 'milestone'" },
-            project: { type: Type.STRING, description: "Parent ID" },
+            type: { type: Type.STRING, description: "'project' (Phase/Parent), 'task' (Actionable Item), or 'milestone'" },
+            project: { type: Type.STRING, description: "Parent ID. Top level phases should link to 'ROOT-SUMMARY'." },
             dependencies: { type: Type.ARRAY, items: { type: Type.STRING } },
-            cost: { type: Type.NUMBER, description: "Estimated cost for this specific task" },
-            resource: { type: Type.STRING, description: "Execution Resource (Machinery, Equipment, Material) e.g. 'Excavator'" }
+            cost: { type: Type.NUMBER, description: "Cost for this specific task" },
+            resource: { type: Type.STRING, description: "RBS: 'Name (Type)' e.g., 'Excavator (Equipment)', 'Concrete (Material)', 'Crew A (Labor)'" }
         },
         required: ['id', 'name', 'start', 'end', 'progress', 'type', 'cost', 'resource']
     }
@@ -55,18 +55,30 @@ export const generateScheduleFromPlan = async (projectPlan, criteria) => {
         Project Plan: ${JSON.stringify(projectPlan, null, 2)}
         
         Instructions:
-        1. **Structure**: Convert WBS items to tasks. Use 'project' for phases/parents, 'task' for actionable items.
-        2. **Dates**: Calculate realistic start/end dates based on dependencies. 
-           ${criteria?.startDate ? `The first task must start on ${criteria.startDate}.` : ""}
-        3. **Dependencies**: Logic is Key. Task B cannot start until Task A finishes. Populate 'dependencies' array with IDs of predecessors.
-        4. **Resource Loading**: Assign specific **Execution Resources** (Machinery, Equipment, Materials, Labor Crews) required to execute the task.
-        5. **Cost Loading**: Distribute costs **only to 'task' items** (leaves). Do NOT assign costs to 'project' (phase) items to avoid double counting.
-           ${totalBudget > 0 ? `The sum of all 'task' costs MUST EQUAL approximately ${totalBudget} ${currency}.` : `Estimate costs in ${currency}.`}
+        1. **WBS Structure**: 
+           - Create a hierarchical ID structure (e.g., Phase 1 ID="1", Task 1.1 ID="1.1"). 
+           - Use 'type': 'project' for Phases/Groups. Use 'type': 'task' for actionable work.
+           - Ensure 'project' field references the Parent ID correctly.
         
+        2. **Resource Breakdown Structure (RBS)**: 
+           - Do NOT use generic titles like "Manager" or "Staff" for execution tasks.
+           - Resources MUST be categorized as **Labor**, **Material**, or **Equipment**.
+           - Format: "Resource Name (Category)". 
+           - Examples: "Excavator (Equipment)", "Concrete Mix (Material)", "Steel Beams (Material)", "Masonry Crew (Labor)", "Crane (Equipment)".
+
+        3. **Cost Control (CRITICAL)**: 
+           - Distribute costs **only to 'task' items** (leaf nodes). 
+           - ${totalBudget > 0 ? `The SUM of all task costs MUST NOT EXCEED ${totalBudget} ${currency}. Ideally, aim for ${totalBudget * 0.95} to leave room for contingency.` : `Estimate realistic costs in ${currency}.`}
+           - Do not assign cost to 'project' or 'milestone' types directly (they roll up).
+
+        4. **Dependencies**: 
+           - Task B cannot start until Task A finishes. 
+           - Ensure logical predecessor linking.
+
         Return a JSON array matching the schema.
     `;
 
-    const systemInstruction = "You are an expert AI Project Scheduler. You specialize in Critical Path Method (CPM), Resource Allocation, and Cost Estimation.";
+    const systemInstruction = "You are an expert Construction Project Scheduler & Cost Engineer. You strictly adhere to the Resource Breakdown Structure (RBS) and Budget Constraints.";
 
     try {
         const jsonText = await generateAIContent(prompt, ganttChartSchema, systemInstruction);
@@ -98,7 +110,7 @@ export const generateScheduleFromPlan = async (projectPlan, criteria) => {
                 project: null,
                 dependencies: [],
                 cost: 0,
-                resource: 'Project Manager'
+                resource: 'Project Management'
             };
             scheduleData.unshift(rootNode);
         }
@@ -174,8 +186,17 @@ export const generateScheduleFromPlan = async (projectPlan, criteria) => {
 
             const children = childrenMap.get(node.id) || [];
             // Sort: Projects/Phases first, then by Start Date
+            // This fixes the "sorting not correct" issue by enforcing structure first
             children.sort((a, b) => {
+                // Priority 1: ID sequence (if numeric/alphanumeric)
+                const aId = parseFloat(a.id);
+                const bId = parseFloat(b.id);
+                if (!isNaN(aId) && !isNaN(bId)) {
+                    return aId - bId;
+                }
+                // Priority 2: Projects before Tasks
                 if (a.type !== b.type) return a.type === 'project' ? -1 : 1;
+                // Priority 3: Start Date
                 return new Date(a.start) - new Date(b.start);
             });
 

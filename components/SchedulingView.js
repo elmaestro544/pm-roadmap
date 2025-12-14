@@ -41,13 +41,13 @@ const LoadingView = () => (
     React.createElement('div', { className: 'text-center flex flex-col items-center h-full justify-center' },
         React.createElement(ScheduleIcon, { className: 'h-16 w-16 animate-pulse text-brand-purple-light' }),
         React.createElement('h2', { className: 'text-3xl font-bold mt-4 mb-2 text-white' }, "Building Schedule..."),
-        React.createElement('p', { className: 'text-brand-text-light mb-8' }, "Calculating critical path, assigning execution resources, and loading costs."),
+        React.createElement('p', { className: 'text-brand-text-light mb-8' }, "Calculating critical path, assigning RBS (Labor, Material, Equipment), and balancing budget."),
         React.createElement(Spinner, { size: '12' })
     )
 );
 
 // --- Timeline View with Synchronized Scroll ---
-const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpdate }) => {
+const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpdate, sortMode }) => {
     const [showDetails, setShowDetails] = useState(false);
 
     // 1. Data Preparation
@@ -136,20 +136,41 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
     }, [periods, scale, colWidth]);
 
 
+    // Sorting Logic
     const visibleTasks = useMemo(() => {
-        const result = [];
+        let result = [];
+        let sorted = [...tasks];
+
+        if (sortMode === 'date') {
+            // Flatten: Filter only tasks/milestones (no groups) and sort by date
+            sorted = tasks.filter(t => t.type !== 'project' && t.id !== 'ROOT-SUMMARY')
+                          .sort((a, b) => new Date(a.start) - new Date(b.start));
+        } else if (sortMode === 'resource') {
+            // Flatten: Sort by Resource Name
+            sorted = tasks.filter(t => t.type !== 'project' && t.id !== 'ROOT-SUMMARY')
+                          .sort((a, b) => (a.resource || '').localeCompare(b.resource || ''));
+        } 
+        // else sortMode === 'wbs' (Default hierarchical)
+
         let colorIndex = 0;
         
-        tasks.forEach(task => {
+        sorted.forEach(task => {
             const taskWithColor = { ...task };
             
+            // Indentation logic overrides
+            if (sortMode !== 'wbs') {
+                taskWithColor.level = 0; // Remove indentation in non-WBS views
+            }
+
             if (task.type === 'project') {
                 taskWithColor.color = '#1E1B2E'; 
             } else if (task.type === 'task') {
-                // Check if ALL parents up the chain are expanded
+                // Visibility Check (Only relevant for WBS mode)
                 let visible = true;
-                if (task.project && !expanded.has(task.project) && task.project !== 'ROOT-SUMMARY') {
-                    visible = false;
+                if (sortMode === 'wbs') {
+                    if (task.project && !expanded.has(task.project) && task.project !== 'ROOT-SUMMARY') {
+                        visible = false;
+                    }
                 }
                 
                 if (visible) {
@@ -164,7 +185,7 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
             result.push(taskWithColor);
         });
         return result;
-    }, [tasks, expanded]);
+    }, [tasks, expanded, sortMode]);
 
     const getLeftPos = (dateStr) => {
         const date = new Date(dateStr);
@@ -191,7 +212,7 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
     const detailedColumns = [
         { id: 'start', label: 'Start', width: 90, render: t => formatDate(t.start) },
         { id: 'end', label: 'End', width: 90, render: t => formatDate(t.end) },
-        { id: 'resource', label: 'Execution Resource', width: 140, render: t => t.resource || '-' },
+        { id: 'resource', label: 'RBS / Resource', width: 140, render: t => t.resource || '-' },
         { id: 'cost', label: 'Cost', width: 80, render: t => t.cost ? t.cost.toLocaleString() : '-' },
         { id: 'progress', label: '%', width: 50, render: t => t.progress + '%' },
         { id: 'dependencies', label: 'Pred.', width: 70, render: t => t.dependencies?.join(',') || '' }
@@ -201,8 +222,10 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
     const totalDetailsWidth = detailedColumns.reduce((acc, col) => acc + col.width, 0);
     const taskListWidth = showDetails ? nameColumnWidth + totalDetailsWidth : nameColumnWidth;
 
-    // Dependency Lines Calculation (Orthogonal)
+    // Dependency Lines (Only show in WBS mode to avoid chaos)
     const dependencyLines = useMemo(() => {
+        if (sortMode !== 'wbs') return [];
+        
         const lines = [];
         const taskYMap = new Map();
         visibleTasks.forEach((t, i) => taskYMap.set(t.id, i * rowHeight + (rowHeight / 2)));
@@ -243,7 +266,7 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
             }
         });
         return lines;
-    }, [visibleTasks, tasks, dates, scale, zoom]);
+    }, [visibleTasks, tasks, dates, scale, zoom, sortMode]);
 
     return React.createElement('div', { className: 'h-full w-full overflow-auto bg-dark-bg relative border border-dark-border rounded-xl scrollbar-thin' },
         React.createElement('div', { className: 'min-w-fit flex flex-col relative' },
@@ -366,7 +389,8 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                             style: { width: nameColumnWidth }
                         },
                             React.createElement('div', { style: { width: level * 16 } }), // Indentation based on robust hierarchy
-                            isProject && React.createElement('button', { 
+                            // Toggle Button only for Projects in WBS mode
+                            (isProject && sortMode === 'wbs') && React.createElement('button', { 
                                 onClick: () => onToggle(task.id),
                                 className: 'p-0.5 hover:text-white text-brand-purple-light focus:outline-none'
                             }, expanded.has(task.id) ? '▼' : '▶'),
@@ -510,7 +534,7 @@ const EditableListView = ({ tasks, onUpdate, currency, groupBy }) => {
                     React.createElement('th', { className: 'p-4 font-semibold' }, "Task Name"),
                     React.createElement('th', { className: 'p-4 font-semibold' }, "Start Date"),
                     React.createElement('th', { className: 'p-4 font-semibold' }, "End Date"),
-                    React.createElement('th', { className: 'p-4 font-semibold' }, "Resource"),
+                    React.createElement('th', { className: 'p-4 font-semibold' }, "Resource (RBS)"),
                     React.createElement('th', { className: 'p-4 font-semibold' }, `Cost (${currency})`),
                     React.createElement('th', { className: 'p-4 font-semibold' }, "Progress"),
                     React.createElement('th', { className: 'p-4 font-semibold' }, "Predecessors")
@@ -603,7 +627,8 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
     const fullscreenRef = useRef(null);
     
     const [viewMode, setViewMode] = useState('timeline');
-    const [groupBy, setGroupBy] = useState('wbs'); // wbs, resource, status
+    const [groupBy, setGroupBy] = useState('wbs'); // Used for List View
+    const [sortMode, setSortMode] = useState('wbs'); // New for Timeline View (wbs, date, resource)
     const [scale, setScale] = useState('days');
     const [zoom, setZoom] = useState(1);
     const [isEditing, setIsEditing] = useState(false);
@@ -699,7 +724,8 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                     scale, 
                     zoom,
                     isEditing,
-                    onUpdate: handleUpdateTask
+                    onUpdate: handleUpdateTask,
+                    sortMode: sortMode // Pass sort mode
                 });
         }
     };
@@ -734,7 +760,21 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                 )
             ),
 
-            // Group By Control (Visible only in List Mode)
+            // Timeline Sorting (Only visible in Timeline)
+            viewMode === 'timeline' && React.createElement('div', { className: 'flex items-center gap-2 ml-2 bg-dark-card-solid border border-dark-border rounded-lg px-2 py-1' },
+                React.createElement('span', { className: 'text-xs text-brand-text-light' }, "Sort By:"),
+                React.createElement('select', {
+                    value: sortMode,
+                    onChange: (e) => setSortMode(e.target.value),
+                    className: 'bg-transparent text-xs text-white outline-none font-semibold cursor-pointer w-24'
+                },
+                    React.createElement('option', { value: 'wbs' }, "Default (WBS)"),
+                    React.createElement('option', { value: 'date' }, "Start Date"),
+                    React.createElement('option', { value: 'resource' }, "Resource")
+                )
+            ),
+
+            // Group By Control (Only Visible in List Mode)
             viewMode === 'list' && React.createElement('div', { className: 'flex items-center gap-2 ml-2 bg-dark-card-solid border border-dark-border rounded-lg px-2 py-1' },
                 React.createElement('span', { className: 'text-xs text-brand-text-light' }, "Group By:"),
                 React.createElement('select', {
