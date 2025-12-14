@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { i18n, DASHBOARD_VIEWS } from '../constants.js';
 import AssistantView from './Chat.js'; 
@@ -12,14 +13,16 @@ import KpiView from './KpiView.js';
 import SCurveView from './SCurveView.js';
 import ComprehensivePlanView from './ComprehensivePlanView.js';
 import ProjectOverview from './ProjectOverview.js'; 
+import ControlCycleView from './ControlCycleView.js';
 import { UserIcon, SidebarToggleIcon, Logo, Spinner, HistoryIcon, PlusIcon, ChevronRightIcon } from './Shared.js';
 import { getUserProjects, getProjectDetails, saveProject } from '../services/supabaseClient.js';
 
 // Updated workflow order to match DASHBOARD_VIEWS in constants.js
-const WORKFLOW_ORDER = ['overview', 'consultingPlan', 'planning', 'scheduling', 'budget', 'risk', 'structure', 'kpis', 'scurve', 'assistant'];
+const WORKFLOW_ORDER = ['overview', 'consultingPlan', 'controlCycle', 'planning', 'scheduling', 'budget', 'risk', 'structure', 'kpis', 'scurve', 'assistant'];
 
 const PREREQUISITES = {
     overview: 'objective', // Needs at least the basic project info
+    // controlCycle is informational, no strict prerequisite beyond basics
     planning: 'objective', 
     scheduling: 'plan',
     budget: 'objective',
@@ -291,7 +294,7 @@ const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick, ini
     };
     
     // Check prerequisites
-    if (activeView !== 'assistant' && activeView !== 'consultingPlan') {
+    if (activeView !== 'assistant' && activeView !== 'consultingPlan' && activeView !== 'controlCycle') {
         const prerequisite = PREREQUISITES[activeView];
         if (prerequisite && !projectData[prerequisite]) {
             return React.createElement(PrerequisiteView, { missing: prerequisite, language, onViewChange: setActiveView });
@@ -305,6 +308,8 @@ const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick, ini
             return React.createElement(AssistantView, { language, currentUser });
         case 'consultingPlan':
             return React.createElement(ComprehensivePlanView, commonProps);
+        case 'controlCycle':
+            return React.createElement(ControlCycleView, { language, projectData, onNavigate: setActiveView });
         case 'planning':
             return React.createElement(PlanningView, commonProps);
         case 'scheduling':
@@ -339,7 +344,7 @@ const Dashboard = ({ language, setView, currentUser, onLogout, onLoginClick, ini
         React.createElement(ProjectHeader, { 
             language, 
             objective: projectData.objective || projectData.consultingPlan?.projectTitle, 
-            onReset: handleResetProject,
+            onReset: handleResetProject, 
             onNext: handleNext,
             onPrev: handlePrev,
             activeView,
