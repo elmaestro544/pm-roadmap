@@ -141,7 +141,7 @@ const VisualRiskMap = ({ risks }) => {
         'Low': risks.filter(r => r.severity === 'Low')
     };
 
-    return React.createElement('div', { className: 'bg-dark-card-solid border border-dark-border rounded-xl p-6 h-full flex flex-col' },
+    return React.createElement('div', { className: 'bg-dark-card-solid border border-dark-border rounded-xl p-6 flex flex-col h-[300px]' },
         React.createElement('h3', { className: 'font-bold text-white mb-6 flex items-center gap-2' }, 
             React.createElement('span', { className: 'w-1 h-5 bg-brand-purple rounded-full' }),
             'Risk Timeline Map'
@@ -209,7 +209,7 @@ const RiskListView = ({ risks, onSelectRisk }) => {
     };
 
     return React.createElement('div', { className: 'h-full flex flex-col bg-dark-card-solid border border-dark-border rounded-xl overflow-hidden' },
-        React.createElement('div', { className: 'p-4 border-b border-dark-border bg-dark-card/50' },
+        React.createElement('div', { className: 'p-4 border-b border-dark-border bg-dark-card/50 flex-shrink-0' },
             React.createElement('h3', { className: 'font-bold text-white flex items-center gap-2' }, 
                 React.createElement(ListIcon, { className: "w-4 h-4 text-brand-purple-light" }),
                 `Identified Risks (${risks.length})`
@@ -235,15 +235,12 @@ const RiskListView = ({ risks, onSelectRisk }) => {
 };
 
 const RiskMatrix = ({ risks }) => {
-    // Standard 5x5 Matrix
     const likelihoods = ['Rare', 'Unlikely', 'Possible', 'Likely', 'Certain'];
-    const impacts = ['Minor', 'Moderate', 'Major', 'Critical']; // AI usually returns 4 levels, let's map Critical to top.
+    const impacts = ['Minor', 'Moderate', 'Major', 'Critical'];
     
-    // Map data
     const matrixData = useMemo(() => {
         const grid = {};
         impacts.forEach(i => likelihoods.forEach(l => grid[`${i}-${l}`] = []));
-        
         risks.forEach(risk => {
             const key = `${risk.impact}-${risk.likelihood}`;
             if (grid[key]) grid[key].push(risk);
@@ -252,65 +249,67 @@ const RiskMatrix = ({ risks }) => {
     }, [risks]);
 
     const getCellColor = (rowIdx, colIdx) => {
-        // rowIdx 0 = Critical (Top), rowIdx 3 = Minor (Bottom)
-        // colIdx 0 = Rare (Left), colIdx 4 = Certain (Right)
-        
-        // Heatmap logic: (4 - rowIdx) is magnitude (0-3), colIdx is prob (0-4)
-        // Adjust indices to standard risk score calculation: 
-        // Impact Score: Critical(4), Major(3), Moderate(2), Minor(1) -> so score = 4 - rowIdx
-        // Prob Score: Rare(1) ... Certain(5) -> score = colIdx + 1
-        
         const impactScore = 4 - rowIdx;
         const probScore = colIdx + 1;
-        const riskScore = impactScore * probScore; // Max 20, Min 1
+        const riskScore = impactScore * probScore; 
         
-        if (riskScore >= 12) return 'bg-red-500/20 border-red-500/30 text-red-100 hover:bg-red-500/40'; // High
-        if (riskScore >= 6) return 'bg-yellow-500/20 border-yellow-500/30 text-yellow-100 hover:bg-yellow-500/40'; // Medium
-        return 'bg-green-500/20 border-green-500/30 text-green-100 hover:bg-green-500/40'; // Low
+        if (riskScore >= 12) return 'bg-red-500/20 border-red-500/30 text-red-100 hover:bg-red-500/40';
+        if (riskScore >= 6) return 'bg-yellow-500/20 border-yellow-500/30 text-yellow-100 hover:bg-yellow-500/40';
+        return 'bg-green-500/20 border-green-500/30 text-green-100 hover:bg-green-500/40';
     };
 
-    return React.createElement('div', { className: 'bg-dark-card-solid border border-dark-border rounded-xl p-4 h-full flex flex-col' },
-        React.createElement('div', { className: 'flex items-center justify-between mb-4' },
+    return React.createElement('div', { className: 'bg-dark-card-solid border border-dark-border rounded-xl p-6 w-full' },
+        React.createElement('div', { className: 'flex items-center justify-between mb-6' },
             React.createElement('h3', { className: 'font-bold text-white flex items-center gap-2' }, 
                 React.createElement('span', { className: 'w-1 h-5 bg-brand-purple rounded-full' }),
-                'Risk Matrix'
+                'Risk Matrix Analysis'
             )
         ),
-        React.createElement('div', { className: 'flex-grow grid grid-cols-[auto_1fr] gap-2 min-h-0' },
-            // Y-Axis Label
-            React.createElement('div', { className: 'flex flex-col justify-center items-center' },
-                React.createElement('span', { className: '-rotate-90 text-xs font-bold text-brand-text-light uppercase tracking-widest whitespace-nowrap' }, "Impact")
+        
+        React.createElement('div', { className: 'flex flex-col' },
+            // Top Headers (Likelihood)
+            React.createElement('div', { className: 'flex mb-2' },
+                React.createElement('div', { className: 'w-32 flex-shrink-0 flex items-end justify-end pr-4 pb-2' },
+                    React.createElement('span', { className: 'text-xs font-bold text-brand-text-light uppercase tracking-widest' }, "Severity")
+                ),
+                React.createElement('div', { className: 'flex-grow grid grid-cols-5 gap-1' },
+                    React.createElement('div', { className: 'col-span-5 text-center text-xs font-bold text-brand-text-light uppercase tracking-widest border-b border-dark-border mb-2 pb-1' }, "Likelihood"),
+                    ...likelihoods.map(l => React.createElement('div', { key: l, className: 'text-center text-xs font-bold text-white uppercase bg-dark-bg py-1 rounded' }, l))
+                )
             ),
-            
-            // Grid Container
-            React.createElement('div', { className: 'flex flex-col h-full' },
-                // Matrix Cells
-                React.createElement('div', { className: 'grid grid-cols-5 grid-rows-4 gap-1 flex-grow' },
-                    impacts.slice().reverse().map((impact, rowIdx) => // Reverse so Critical is top
+
+            React.createElement('div', { className: 'flex' },
+                // Left Headers (Impact/Severity)
+                React.createElement('div', { className: 'w-32 flex-shrink-0 flex flex-col gap-1 pr-2' },
+                    impacts.slice().reverse().map(i => 
+                        React.createElement('div', { key: i, className: 'h-24 flex items-center justify-end px-3 text-xs font-bold text-white uppercase bg-dark-bg rounded' }, i)
+                    )
+                ),
+                
+                // Matrix Grid
+                React.createElement('div', { className: 'flex-grow grid grid-cols-5 grid-rows-4 gap-1' },
+                    impacts.slice().reverse().map((impact, rowIdx) => 
                         likelihoods.map((likelihood, colIdx) => {
                             const key = `${impact}-${likelihood}`;
                             const items = matrixData[key] || [];
                             
                             return React.createElement('div', { 
                                 key: key,
-                                className: `relative border rounded transition-all flex items-center justify-center ${getCellColor(rowIdx, colIdx)}`
+                                className: `relative border rounded transition-all p-2 h-24 overflow-y-auto scrollbar-thin ${getCellColor(rowIdx, colIdx)}`
                             },
-                                items.length > 0 ? (
-                                    React.createElement('span', { className: 'font-bold text-lg' }, items.length)
-                                ) : null
+                                items.length > 0 && (
+                                    React.createElement('div', { className: 'flex flex-col gap-1' },
+                                        React.createElement('span', { className: 'text-[10px] font-bold opacity-70 mb-1' }, items.length),
+                                        items.map(r => 
+                                            React.createElement('div', { key: r.id, className: 'text-[10px] leading-tight truncate' }, `• ${r.title}`)
+                                        )
+                                    )
+                                )
                             );
                         })
                     )
-                ),
-                
-                // X-Axis Labels
-                React.createElement('div', { className: 'grid grid-cols-5 text-center mt-2' },
-                    likelihoods.map(l => React.createElement('span', { key: l, className: 'text-[9px] font-bold text-brand-text-light uppercase truncate px-1' }, l))
                 )
             )
-        ),
-        React.createElement('div', { className: 'text-center mt-1' },
-             React.createElement('span', { className: 'text-xs font-bold text-brand-text-light uppercase tracking-widest' }, "Likelihood")
         )
     );
 };
@@ -326,8 +325,8 @@ const StatCard = ({ label, value, icon, color }) => (
 );
 
 const RiskRegister = ({ risks }) => {
-    return React.createElement('div', { className: 'mt-6 bg-dark-card-solid border border-dark-border rounded-xl overflow-hidden' },
-        React.createElement('div', { className: 'p-4 border-b border-dark-border flex justify-between items-center bg-dark-card/50' },
+    return React.createElement('div', { className: 'h-full flex flex-col bg-dark-card-solid border border-dark-border rounded-xl overflow-hidden' },
+        React.createElement('div', { className: 'p-4 border-b border-dark-border flex justify-between items-center bg-dark-card/50 flex-shrink-0' },
             React.createElement('h3', { className: 'font-bold text-white flex items-center gap-2' }, 
                 React.createElement(DocumentIcon, { className: "w-5 h-5 text-brand-purple-light" }),
                 "Risk Register"
@@ -336,9 +335,9 @@ const RiskRegister = ({ risks }) => {
                 React.createElement(DownloadIcon, { className: "w-3 h-3" }), "Export CSV"
             )
         ),
-        React.createElement('div', { className: 'overflow-x-auto' },
+        React.createElement('div', { className: 'flex-grow overflow-auto' }, // Allow vertical scrolling here
             React.createElement('table', { className: 'w-full text-sm text-left' },
-                React.createElement('thead', { className: 'bg-dark-bg text-brand-text-light font-semibold border-b border-dark-border' },
+                React.createElement('thead', { className: 'bg-dark-bg text-brand-text-light font-semibold border-b border-dark-border sticky top-0' },
                     React.createElement('tr', null,
                         React.createElement('th', { className: 'p-4' }, "ID"),
                         React.createElement('th', { className: 'p-4' }, "Risk Title"),
@@ -388,7 +387,7 @@ const ResultsView = ({ data, onUpdate }) => {
     return React.createElement('div', { className: 'w-full h-full flex flex-col gap-6 animate-fade-in-up' },
         
         // --- Top Bar ---
-        React.createElement('div', { className: 'flex justify-between items-center bg-dark-card-solid border border-dark-border p-4 rounded-xl shadow-lg' },
+        React.createElement('div', { className: 'flex-shrink-0 flex justify-between items-center bg-dark-card-solid border border-dark-border p-4 rounded-xl shadow-lg' },
             React.createElement('div', null,
                 React.createElement('h2', { className: 'text-2xl font-bold text-white' }, "Risk & Issue Management"),
                 React.createElement('p', { className: 'text-brand-text-light text-sm' }, "Monitor, assess, and mitigate project uncertainties.")
@@ -422,37 +421,35 @@ const ResultsView = ({ data, onUpdate }) => {
         viewMode === 'dashboard' ? (
             React.createElement('div', { className: 'flex-grow grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0' },
                 
-                // Left Column: List (3 cols)
-                React.createElement('div', { className: 'lg:col-span-3 flex flex-col min-h-0' },
+                // Left Column: List (3 cols) - Fixed width, scrollable
+                React.createElement('div', { className: 'lg:col-span-3 flex flex-col min-h-0 h-full' },
                     React.createElement(RiskListView, { risks: risks })
                 ),
 
-                // Right Column: Visuals (9 cols)
-                React.createElement('div', { className: 'lg:col-span-9 flex flex-col gap-6 min-h-0' },
-                    // Row 1: Timeline Map (Fixed Height)
-                    React.createElement('div', { className: 'h-72 flex-shrink-0' },
+                // Right Column: Visuals (9 cols) - Stacked vertically, scrollable parent
+                React.createElement('div', { className: 'lg:col-span-9 flex flex-col gap-6 h-full overflow-y-auto pr-2 pb-6' },
+                    // 1. Stats Row
+                    React.createElement('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 flex-shrink-0' },
+                        React.createElement(StatCard, { label: 'Total Risks', value: summary.total, icon: '!', color: '#6366F1' }), // Indigo
+                        React.createElement(StatCard, { label: 'High Severity', value: summary.high, icon: '▲', color: '#EF4444' }), // Red
+                        React.createElement(StatCard, { label: 'Medium Severity', value: summary.medium, icon: '●', color: '#F59E0B' }), // Amber
+                        React.createElement(StatCard, { label: 'Closed Risks', value: summary.closed, icon: '✓', color: '#10B981' }) // Green
+                    ),
+
+                    // 2. Timeline Map (Wide)
+                    React.createElement('div', { className: 'flex-shrink-0' },
                         React.createElement(VisualRiskMap, { risks: risks })
                     ),
                     
-                    // Row 2: Stats & Matrix
-                    React.createElement('div', { className: 'flex-grow grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[300px]' },
-                        // Stats Grid
-                        React.createElement('div', { className: 'grid grid-cols-2 gap-4 auto-rows-fr' },
-                            React.createElement(StatCard, { label: 'Total Risks', value: summary.total, icon: '!', color: '#6366F1' }), // Indigo
-                            React.createElement(StatCard, { label: 'High Severity', value: summary.high, icon: '▲', color: '#EF4444' }), // Red
-                            React.createElement(StatCard, { label: 'Medium Severity', value: summary.medium, icon: '●', color: '#F59E0B' }), // Amber
-                            React.createElement(StatCard, { label: 'Closed Risks', value: summary.closed, icon: '✓', color: '#10B981' }) // Green
-                        ),
-                        // Matrix
-                        React.createElement('div', { className: 'h-full' },
-                            React.createElement(RiskMatrix, { risks: risks })
-                        )
+                    // 3. Risk Matrix (Wide)
+                    React.createElement('div', { className: 'flex-shrink-0' },
+                        React.createElement(RiskMatrix, { risks: risks })
                     )
                 )
             )
         ) : (
-            // Register View
-            React.createElement('div', { className: 'flex-grow overflow-hidden flex flex-col' },
+            // Register View - Ensure it takes full height and scrolls
+            React.createElement('div', { className: 'flex-grow overflow-hidden flex flex-col h-full' },
                 React.createElement(RiskRegister, { risks: risks })
             )
         ),
@@ -512,7 +509,7 @@ const RiskView = ({ language, projectData, onUpdateProject, isLoading, setIsLoad
             onZoomOut: handleZoomOut,
             onExport: handleExport
         }),
-        React.createElement('div', { className: 'flex-grow min-h-0 overflow-y-auto' },
+        React.createElement('div', { className: 'flex-grow min-h-0 overflow-hidden' }, // Changed to overflow-hidden so children manage scroll
             React.createElement('div', {
                className: 'p-6 printable-content h-full flex flex-col',
                style: { transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.2s ease' }
