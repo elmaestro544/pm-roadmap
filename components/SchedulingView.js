@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { generateScheduleFromPlan, applyCorrectiveAction, recalculateScheduleHierarchy } from '../services/schedulingService.js';
-import { ScheduleIcon, Spinner, BoardIcon, ListIcon, TimelineIcon, ZoomInIcon, ZoomOutIcon, FullscreenIcon, FullscreenExitIcon, ExpandIcon, CollapseIcon, EditIcon, ExportIcon, RefreshIcon, StructureIcon, ChevronRightIcon, RiskIcon } from './Shared.js';
+import { ScheduleIcon, Spinner, BoardIcon, ListIcon, TimelineIcon, ZoomInIcon, ZoomOutIcon, FullscreenIcon, FullscreenExitIcon, ExpandIcon, CollapseIcon, EditIcon, ExportIcon, RefreshIcon, StructureIcon, ChevronRightIcon, RiskIcon, MatrixIcon } from './Shared.js';
 import { i18n } from '../constants.js';
 
 // --- Helper Functions ---
@@ -663,6 +663,65 @@ const EditableListView = ({ tasks, onUpdate, currency, groupBy, showCriticalPath
     );
 };
 
+const ScheduleMatrixView = ({ tasks }) => {
+    // Determine Project Start Date for relative calculation if needed, 
+    // but tasks already have absolute dates. We just use them directly.
+    // However, CPM (ES/EF/LS/LF) are usually relative integers in schedulingService.
+    // We need to convert them to dates relative to project start.
+    
+    const projectStartDate = useMemo(() => {
+        if (!tasks.length) return new Date();
+        const startDates = tasks.map(t => new Date(t.start).getTime()).filter(d => !isNaN(d));
+        return new Date(Math.min(...startDates));
+    }, [tasks]);
+
+    const toDate = (relativeDays) => {
+        // If relativeDays is undefined/null, return '-'
+        if (relativeDays === undefined || relativeDays === null) return '-';
+        return formatDate(addDays(projectStartDate, relativeDays));
+    };
+
+    const flatTasks = tasks.filter(t => t.id !== 'ROOT-SUMMARY'); // Exclude root summary for cleaner matrix
+
+    return React.createElement('div', { className: 'h-full overflow-auto bg-dark-card rounded-xl border border-dark-border print:bg-white print:border-gray-300' },
+        React.createElement('table', { className: 'w-full text-left text-xs' },
+            React.createElement('thead', { className: 'bg-dark-card-solid text-brand-text-light sticky top-0 z-10 print:bg-gray-100 print:text-black' },
+                React.createElement('tr', null,
+                    React.createElement('th', { className: 'p-3 font-semibold border-b border-dark-border w-16' }, "ID"),
+                    React.createElement('th', { className: 'p-3 font-semibold border-b border-dark-border' }, "Task Name"),
+                    React.createElement('th', { className: 'p-3 font-semibold border-b border-dark-border text-center' }, "Dur."),
+                    React.createElement('th', { className: 'p-3 font-semibold border-b border-dark-border' }, "Early Start"),
+                    React.createElement('th', { className: 'p-3 font-semibold border-b border-dark-border' }, "Early Finish"),
+                    React.createElement('th', { className: 'p-3 font-semibold border-b border-dark-border' }, "Late Start"),
+                    React.createElement('th', { className: 'p-3 font-semibold border-b border-dark-border' }, "Late Finish"),
+                    React.createElement('th', { className: 'p-3 font-semibold border-b border-dark-border text-center' }, "Float"),
+                    React.createElement('th', { className: 'p-3 font-semibold border-b border-dark-border text-center' }, "Critical")
+                )
+            ),
+            React.createElement('tbody', { className: 'divide-y divide-dark-border print:divide-gray-200' },
+                flatTasks.map(task => {
+                    const cpm = task.cpm || {};
+                    return React.createElement('tr', { key: task.id, className: `hover:bg-white/5 print:text-black ${task.isCritical ? 'bg-red-500/10' : ''}` },
+                        React.createElement('td', { className: 'p-3 text-brand-text-light font-mono' }, task.id),
+                        React.createElement('td', { className: `p-3 ${task.type === 'project' ? 'font-bold text-white' : 'text-slate-200'}` }, task.name),
+                        React.createElement('td', { className: 'p-3 text-center text-slate-300' }, cpm.duration ?? '-'),
+                        React.createElement('td', { className: 'p-3 text-brand-text-light' }, toDate(cpm.es)),
+                        React.createElement('td', { className: 'p-3 text-brand-text-light' }, toDate(cpm.ef)),
+                        React.createElement('td', { className: 'p-3 text-brand-text-light' }, toDate(cpm.ls)),
+                        React.createElement('td', { className: 'p-3 text-brand-text-light' }, toDate(cpm.lf)),
+                        React.createElement('td', { className: `p-3 text-center font-bold ${cpm.float === 0 ? 'text-red-400' : 'text-green-400'}` }, cpm.float ?? '-'),
+                        React.createElement('td', { className: 'p-3 text-center' }, 
+                            task.isCritical 
+                                ? React.createElement('span', { className: 'px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-[10px] font-bold uppercase' }, "Yes") 
+                                : React.createElement('span', { className: 'text-slate-500 text-[10px]' }, "No")
+                        )
+                    );
+                })
+            )
+        )
+    );
+};
+
 const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, setIsLoading, error, setError }) => {
     const t = i18n[language];
     const fullscreenRef = useRef(null);
@@ -676,7 +735,7 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
     const [expanded, setExpanded] = useState(new Set());
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showCriticalPath, setShowCriticalPath] = useState(false);
-    const [optimizationAction, setOptimizationAction] = useState('none');
+    const [isOptimizeOpen, setIsOptimizeOpen] = useState(false); // Changed to controlled state
 
     const generate = async () => {
         try {
@@ -721,7 +780,7 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
         if (!projectData.schedule) return;
         const optimizedSchedule = applyCorrectiveAction(projectData.schedule, action);
         onUpdateProject({ schedule: optimizedSchedule });
-        setOptimizationAction('none'); // Reset dropdown
+        setIsOptimizeOpen(false); // Close dropdown
         setShowCriticalPath(true); // Show critical path so user sees changes
     };
 
@@ -775,6 +834,8 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                 });
             case 'board':
                 return React.createElement(BoardView, { tasks: projectData.schedule });
+            case 'matrix':
+                return React.createElement(ScheduleMatrixView, { tasks: projectData.schedule });
             default:
                 return React.createElement(TimelineView, { 
                     tasks: projectData.schedule, 
@@ -793,24 +854,25 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
     const IconButton = ({ icon, onClick, tooltip, active, className='' }) => (
         React.createElement('button', {
             onClick, title: tooltip,
-            className: `p-2 rounded-md transition-colors ${active ? 'bg-brand-purple text-white' : 'text-brand-text-light hover:bg-white/10 hover:text-white'} ${className}`
+            className: `p-2 flex-shrink-0 rounded-md transition-colors ${active ? 'bg-brand-purple text-white' : 'text-brand-text-light hover:bg-white/10 hover:text-white'} ${className}`
         }, icon)
     );
 
     const customControls = (
-        React.createElement('div', { className: 'flex items-center gap-2' },
+        React.createElement('div', { className: 'flex items-center gap-2 flex-shrink-0' },
             React.createElement('button', {
                 onClick: generate,
-                className: 'p-2 rounded-md text-brand-text-light hover:bg-white/10 hover:text-white transition-colors',
+                className: 'p-2 rounded-md text-brand-text-light hover:bg-white/10 hover:text-white transition-colors flex-shrink-0',
                 title: "Regenerate Schedule"
             }, React.createElement(RefreshIcon, { className: "h-5 w-5" })),
             
             // View Mode Switcher
-            React.createElement('div', { className: 'flex bg-dark-card-solid rounded-lg p-1 border border-dark-border' },
+            React.createElement('div', { className: 'flex bg-dark-card-solid rounded-lg p-1 border border-dark-border flex-shrink-0' },
                 [
                     { id: 'timeline', label: 'Timeline', icon: TimelineIcon },
                     { id: 'board', label: 'Board', icon: BoardIcon },
-                    { id: 'list', label: 'List', icon: ListIcon }
+                    { id: 'list', label: 'List', icon: ListIcon },
+                    { id: 'matrix', label: 'Matrix', icon: MatrixIcon }
                 ].map(mode => 
                     React.createElement('button', {
                         key: mode.id,
@@ -821,7 +883,7 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
             ),
 
             // Timeline Sorting (Only visible in Timeline)
-            viewMode === 'timeline' && React.createElement('div', { className: 'flex items-center gap-2 ml-2 bg-dark-card-solid border border-dark-border rounded-lg px-2 py-1' },
+            viewMode === 'timeline' && React.createElement('div', { className: 'flex items-center gap-2 ml-2 bg-dark-card-solid border border-dark-border rounded-lg px-2 py-1 flex-shrink-0' },
                 React.createElement('span', { className: 'text-xs text-brand-text-light' }, "Sort By:"),
                 React.createElement('select', {
                     value: sortMode,
@@ -835,7 +897,7 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
             ),
 
             // Group By Control (Only Visible in List Mode)
-            viewMode === 'list' && React.createElement('div', { className: 'flex items-center gap-2 ml-2 bg-dark-card-solid border border-dark-border rounded-lg px-2 py-1' },
+            viewMode === 'list' && React.createElement('div', { className: 'flex items-center gap-2 ml-2 bg-dark-card-solid border border-dark-border rounded-lg px-2 py-1 flex-shrink-0' },
                 React.createElement('span', { className: 'text-xs text-brand-text-light' }, "Group By:"),
                 React.createElement('select', {
                     value: groupBy,
@@ -852,43 +914,55 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
 
     return React.createElement('div', { ref: fullscreenRef, className: "h-full flex flex-col text-white bg-dark-card printable-container" },
         // --- Custom Header Implementation ---
-        React.createElement('div', { className: 'non-printable flex-shrink-0 border-b border-dark-border bg-dark-card/50 px-4 h-14 flex items-center justify-between' },
+        React.createElement('div', { className: 'non-printable flex-shrink-0 border-b border-dark-border bg-dark-card/50 px-4 h-16 flex items-center justify-between gap-4 overflow-x-auto scrollbar-hide' },
              // Left: Title
-             React.createElement('h2', { className: 'text-lg font-bold text-white mr-4' }, t.dashboardScheduling),
+             React.createElement('h2', { className: 'text-lg font-bold text-white mr-4 flex-shrink-0' }, t.dashboardScheduling),
              
              // Center: Custom Controls (Modes & Refresh)
              customControls,
              
              // Right: Tools
-             React.createElement('div', { className: 'flex items-center gap-2' },
+             React.createElement('div', { className: 'flex items-center gap-2 flex-shrink-0' },
                 
                 // Critical Path Toggle
                 React.createElement('button', {
                     onClick: () => setShowCriticalPath(!showCriticalPath),
-                    className: `flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold border transition-colors ${showCriticalPath ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-dark-card border-dark-border text-brand-text-light hover:bg-white/5'}`
+                    className: `flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold border transition-colors flex-shrink-0 ${showCriticalPath ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-dark-card border-dark-border text-brand-text-light hover:bg-white/5'}`
                 }, 
                     React.createElement(StructureIcon, { className: "w-3 h-3" }),
                     "Critical Path"
                 ),
 
-                // Corrective Actions Dropdown
-                React.createElement('div', { className: 'relative group' },
-                    React.createElement('button', { className: 'flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold bg-dark-card border border-dark-border text-brand-text-light hover:bg-white/5' },
+                // Corrective Actions Dropdown (Click based)
+                React.createElement('div', { className: 'relative' },
+                    React.createElement('button', { 
+                        onClick: () => setIsOptimizeOpen(!isOptimizeOpen),
+                        className: `flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold border transition-colors flex-shrink-0 ${isOptimizeOpen ? 'bg-white/10 border-white/20 text-white' : 'bg-dark-card border-dark-border text-brand-text-light hover:bg-white/5'}` 
+                    },
                         React.createElement(RiskIcon, { className: "w-3 h-3" }),
                         "Optimize"
                     ),
-                    React.createElement('div', { className: 'absolute right-0 top-full mt-2 w-40 bg-dark-card-solid border border-dark-border rounded-lg shadow-xl z-50 hidden group-hover:block animate-fade-in-up' },
-                        React.createElement('button', { onClick: () => handleOptimize('crash'), className: 'w-full text-left px-4 py-2 text-xs hover:bg-white/10 text-white' }, "Crash Schedule (Cost++)"),
-                        React.createElement('button', { onClick: () => handleOptimize('fast-track'), className: 'w-full text-left px-4 py-2 text-xs hover:bg-white/10 text-white' }, "Fast-Track (Risk++)")
+                    isOptimizeOpen && React.createElement(React.Fragment, null,
+                        React.createElement('div', { className: 'fixed inset-0 z-40', onClick: () => setIsOptimizeOpen(false) }),
+                        React.createElement('div', { className: 'absolute right-0 top-full mt-2 w-48 bg-dark-card-solid border border-dark-border rounded-lg shadow-xl z-50 animate-fade-in-up flex flex-col p-1' },
+                            React.createElement('button', { onClick: () => handleOptimize('crash'), className: 'w-full text-left px-3 py-2 text-xs hover:bg-white/10 text-white rounded-md' }, 
+                                React.createElement('span', { className: 'block font-bold' }, "Crash Schedule"),
+                                React.createElement('span', { className: 'block text-[10px] text-brand-text-light' }, "Reduce duration, increase cost")
+                            ),
+                            React.createElement('button', { onClick: () => handleOptimize('fast-track'), className: 'w-full text-left px-3 py-2 text-xs hover:bg-white/10 text-white rounded-md' }, 
+                                React.createElement('span', { className: 'block font-bold' }, "Fast-Track"),
+                                React.createElement('span', { className: 'block text-[10px] text-brand-text-light' }, "Overlap critical tasks (Risk++)")
+                            )
+                        )
                     )
                 ),
 
                 viewMode === 'timeline' && React.createElement(React.Fragment, null,
-                    React.createElement('div', { className: 'w-px h-6 bg-dark-border mx-1' }),
+                    React.createElement('div', { className: 'w-px h-6 bg-dark-border mx-1 flex-shrink-0' }),
                     React.createElement(IconButton, { icon: React.createElement(ZoomOutIcon), onClick: () => setZoom(z => Math.max(z - 0.2, 0.5)), tooltip: "Zoom Out" }),
                     React.createElement(IconButton, { icon: React.createElement(ZoomInIcon), onClick: () => setZoom(z => Math.min(z + 0.2, 2)), tooltip: "Zoom In" }),
                     
-                    React.createElement('div', { className: 'flex bg-dark-card-solid rounded-lg p-1 border border-dark-border mx-2' },
+                    React.createElement('div', { className: 'flex bg-dark-card-solid rounded-lg p-1 border border-dark-border mx-2 flex-shrink-0' },
                         [
                             { id: 'days', label: 'D' },
                             { id: 'weeks', label: 'W' },
@@ -905,7 +979,7 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                     React.createElement(IconButton, { icon: React.createElement(CollapseIcon), onClick: handleCollapseAll, tooltip: "Collapse All" }),
                 ),
                 
-                React.createElement('div', { className: 'w-px h-6 bg-dark-border mx-1' }),
+                React.createElement('div', { className: 'w-px h-6 bg-dark-border mx-1 flex-shrink-0' }),
                 React.createElement(IconButton, { 
                     icon: React.createElement(EditIcon), 
                     onClick: () => setIsEditing(!isEditing), 

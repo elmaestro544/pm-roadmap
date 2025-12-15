@@ -117,7 +117,20 @@ export const calculateCriticalPath = (tasks) => {
         const calculated = taskMap.get(t.id);
         // Float close to 0 (allow small margin for float rounding)
         const isCritical = calculated.float <= 0; 
-        return { ...t, isCritical };
+        
+        return { 
+            ...t, 
+            isCritical,
+            // Expose CPM details for Matrix View
+            cpm: {
+                es: calculated.es,
+                ef: calculated.ef,
+                ls: calculated.ls,
+                lf: calculated.lf,
+                float: calculated.float,
+                duration: calculated.duration
+            }
+        };
     });
 };
 
