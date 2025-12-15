@@ -1,11 +1,9 @@
 
-
-
 import React, { useState } from 'react';
 import { i18n } from '../constants.js';
 import { 
     PlanningIcon, RiskIcon, ScheduleIcon, BudgetIcon, 
-    AssistantIcon, StructureIcon, KpiIcon, SCurveIcon, DocumentIcon 
+    AssistantIcon, StructureIcon, KpiIcon, SCurveIcon, DocumentIcon, CycleIcon
 } from './Shared.js';
 
 const Workflow = ({ language }) => {
@@ -14,6 +12,7 @@ const Workflow = ({ language }) => {
 
     const steps = [
         { id: 'consulting', title: t.step1Title, desc: t.step1Desc, icon: DocumentIcon },
+        { id: 'controlCycle', title: t.stepCycleTitle, desc: t.stepCycleDesc, icon: CycleIcon },
         { id: 'planning', title: t.step2Title, desc: t.step2Desc, icon: PlanningIcon },
         { id: 'scheduling', title: t.step3Title, desc: t.step3Desc, icon: ScheduleIcon },
         { id: 'budget', title: t.step4Title, desc: t.step4Desc, icon: BudgetIcon },
