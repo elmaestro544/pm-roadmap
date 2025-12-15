@@ -24,17 +24,6 @@ const formatDate = (dateStr) => {
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-const ACTIVITY_COLORS = [
-    '#2DD4BF', // Turquoise (Brand)
-    '#F472B6', // Pink
-    '#818CF8', // Indigo
-    '#FB923C', // Orange
-    '#34D399', // Emerald
-    '#60A5FA', // Blue
-    '#FBBF24', // Amber
-    '#A78BFA'  // Purple
-];
-
 // --- Sub-Components ---
 
 const LoadingView = () => (
@@ -136,51 +125,47 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
     }, [periods, scale, colWidth]);
 
 
-    // Sorting Logic
+    // Sorting Logic & P6 Color Assignment
     const visibleTasks = useMemo(() => {
         let result = [];
         let sorted = [...tasks];
 
         if (sortMode === 'date') {
-            // Flatten: Filter only tasks/milestones (no groups) and sort by date
             sorted = tasks.filter(t => t.type !== 'project' && t.id !== 'ROOT-SUMMARY')
                           .sort((a, b) => new Date(a.start) - new Date(b.start));
         } else if (sortMode === 'resource') {
-            // Flatten: Sort by Resource Name
             sorted = tasks.filter(t => t.type !== 'project' && t.id !== 'ROOT-SUMMARY')
                           .sort((a, b) => (a.resource || '').localeCompare(b.resource || ''));
         } 
         
         // Critical Path Filtering
         if (showCriticalPath) {
-            // Include critical tasks AND their parents to maintain hierarchy context if in WBS mode
-            const criticalIds = new Set(tasks.filter(t => t.isCritical).map(t => t.id));
-            if (sortMode === 'wbs') {
-                sorted = tasks.filter(t => {
-                    if (t.isCritical) return true;
-                    // If it's a project/group, show it only if it has critical children (simplified: show all projects if expanded, or just filter strictly)
-                    // For simplicity in filter mode: Show only items marked critical or Top Level
-                    return t.id === 'ROOT-SUMMARY';
-                });
-            } else {
-                sorted = sorted.filter(t => t.isCritical);
-            }
+            sorted = tasks.filter(t => {
+                if (sortMode === 'wbs') {
+                    // In WBS mode, keep hierarchy nodes to maintain context
+                    return t.isCritical || t.type === 'project' || t.id === 'ROOT-SUMMARY';
+                }
+                return t.isCritical;
+            });
         }
 
-        let colorIndex = 0;
-        
         sorted.forEach(task => {
             const taskWithColor = { ...task };
             
-            // Indentation logic overrides
             if (sortMode !== 'wbs') {
-                taskWithColor.level = 0; // Remove indentation in non-WBS views
+                taskWithColor.level = 0; 
             }
 
-            if (task.type === 'project') {
-                taskWithColor.color = '#1E1B2E'; 
+            // Primavera P6 Color Logic
+            // Project/WBS Summary: Yellow/Gold
+            // Critical Task: Red
+            // Standard Task: Green
+            // Actual Work (Progress): Blue (Handled in render)
+
+            if (task.type === 'project' || task.id === 'ROOT-SUMMARY') {
+                taskWithColor.color = '#F59E0B'; // P6 WBS/Summary Yellow (Amber-500)
+                // WBS bands often black with yellow in P6, but yellow bar is common for baseline/summary in some layouts
             } else if (task.type === 'task') {
-                // Visibility Check (Only relevant for WBS mode)
                 let visible = true;
                 if (sortMode === 'wbs') {
                     if (task.project && !expanded.has(task.project) && task.project !== 'ROOT-SUMMARY') {
@@ -190,13 +175,12 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                 
                 if (visible) {
                     if (task.isCritical) {
-                        taskWithColor.color = '#EF4444'; // Red for Critical
+                        taskWithColor.color = '#EF4444'; // P6 Critical Red (Red-500)
                     } else {
-                        taskWithColor.color = ACTIVITY_COLORS[colorIndex % ACTIVITY_COLORS.length];
-                        colorIndex++;
+                        taskWithColor.color = '#10B981'; // P6 Standard Green (Emerald-500)
                     }
                 } else {
-                    return; // Skip hidden task
+                    return; 
                 }
             } else {
                 taskWithColor.color = '#FFFFFF';
@@ -440,20 +424,27 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
 
                     React.createElement('div', { className: 'relative flex-grow z-20 py-2' }, 
                         React.createElement('div', {
-                            className: `absolute top-1/2 -translate-y-1/2 h-6 rounded shadow-md text-[10px] text-white whitespace-nowrap overflow-visible flex items-center cursor-pointer transition-all hover:brightness-110 ${task.isCritical && !isProject ? 'ring-2 ring-red-500/50' : ''}`,
+                            className: `absolute top-1/2 -translate-y-1/2 rounded shadow-md text-[10px] text-white whitespace-nowrap overflow-visible flex items-center cursor-pointer transition-all hover:brightness-110 ${task.isCritical && !isProject ? 'ring-1 ring-red-500/50' : ''}`,
                             style: { 
                                 left: left, 
                                 width: width,
-                                backgroundColor: isSummary ? '#A855F7' : task.color, 
+                                backgroundColor: task.color, 
                                 opacity: isProject ? 1 : 0.9,
-                                height: isProject ? '12px' : '24px' // Thinner bars for summary/project
+                                height: isProject ? '14px' : '22px' // Thinner bars for summary/project
                             }
                         },
+                            // P6 Style Progress Overlay (Blue)
+                            !isProject && task.progress > 0 && React.createElement('div', {
+                                className: 'absolute top-0 left-0 bottom-0 bg-blue-500 z-10 rounded-l',
+                                style: { width: `${task.progress}%` }
+                            }),
+
                             !isProject && !isSummary && React.createElement('span', { 
                                 className: 'absolute left-full ml-2 text-xs text-brand-text-light font-medium truncate pointer-events-none' 
                             }, task.resource),
 
-                            React.createElement('span', { className: `relative z-10 px-2 drop-shadow-md font-semibold ${width < 30 ? 'hidden' : ''}` },
+                            // Progress Text on Bar
+                            React.createElement('span', { className: `relative z-20 px-2 drop-shadow-md font-semibold ${width < 30 ? 'hidden' : ''}` },
                                 `${task.progress}%`
                             )
                         ),
@@ -778,10 +769,18 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
 
     const handleOptimize = (action) => {
         if (!projectData.schedule) return;
-        const optimizedSchedule = applyCorrectiveAction(projectData.schedule, action);
-        onUpdateProject({ schedule: optimizedSchedule });
-        setIsOptimizeOpen(false); // Close dropdown
-        setShowCriticalPath(true); // Show critical path so user sees changes
+        
+        // Add visual loading state so user knows something is happening
+        setIsLoading(true);
+        
+        // Small timeout to allow UI render of loading state
+        setTimeout(() => {
+            const optimizedSchedule = applyCorrectiveAction(projectData.schedule, action);
+            onUpdateProject({ schedule: optimizedSchedule });
+            setIsOptimizeOpen(false); // Close dropdown
+            setShowCriticalPath(true); // Show critical path so user sees changes
+            setIsLoading(false);
+        }, 100);
     };
 
     const toggleExpand = (id) => {

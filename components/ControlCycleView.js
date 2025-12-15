@@ -60,6 +60,8 @@ const ControlCycleView = ({ language, projectData, onNavigate }) => {
             status: hasAction ? 'Active' : 'Pending',
             desc: "Adjust resources, methods, or targets based on evidence, not intuition.",
             actions: [
+                { label: "Crash Schedule", target: "scheduling" },
+                { label: "Fast Track", target: "scheduling" },
                 { label: "Risk Management", target: "risk" },
                 { label: "Ask AI Assistant", target: "assistant" }
             ],
