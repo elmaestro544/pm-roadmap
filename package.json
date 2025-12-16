@@ -1,3 +1,4 @@
+
 {
   "name": "pm-roadmap",
   "version": "1.0.0",
@@ -5,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "build": "echo 'Runtime env.js ready for injection'",
-    "start": "npx serve -s ."
+    "start": "node generate_env.js && npx serve -s ."
   },
   "keywords": [
     "ai",
