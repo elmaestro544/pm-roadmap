@@ -2,11 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { i18n, AppView } from '../constants.js';
 import { CloseIcon, GoogleIcon, Spinner, LockIcon } from './Shared.js';
-import { signIn, signUp } from '../services/supabaseClient.js';
+import { signIn, signUp, resetPasswordForEmail } from '../services/supabaseClient.js';
 
 const ModalContent = ({
   t,
-  viewMode, // 'login', 'register', 'admin'
+  viewMode, // 'login', 'register', 'admin', 'forgotPassword'
   formData,
   error,
   success,
@@ -19,8 +19,9 @@ const ModalContent = ({
 }) => {
     const isAdmin = viewMode === 'admin';
     const isLogin = viewMode === 'login';
+    const isForgotPassword = viewMode === 'forgotPassword';
 
-    const title = isAdmin ? "Admin Access" : (isLogin ? t.login : t.register);
+    const title = isAdmin ? "Admin Access" : (isForgotPassword ? "Reset Password" : (isLogin ? t.login : t.register));
     
     return React.createElement('div', { className: "bg-dark-card backdrop-blur-xl p-8 rounded-2xl shadow-2xl w-full max-w-md relative glow-border" },
       React.createElement('button', { onClick: onClose, className: "absolute top-4 right-4 text-brand-text-light hover:text-white transition-colors" },
@@ -50,8 +51,19 @@ const ModalContent = ({
              })
         ),
 
+        // Forgot Password View
+        isForgotPassword && React.createElement('div', null,
+            React.createElement('label', { htmlFor: "email", className: "block text-sm font-medium text-brand-text-light mb-1" }, t.emailAddress),
+            React.createElement('input', {
+                type: "email", id: "email", name: "email", required: true,
+                value: formData.email, onChange: handleInputChange,
+                className: "w-full p-2 bg-dark-card-solid border border-dark-border rounded-full focus:ring-2 focus:ring-brand-purple focus:outline-none text-white"
+            }),
+            React.createElement('p', { className: "text-xs text-brand-text-light mt-2 px-2" }, "Enter your email to receive a password reset link.")
+        ),
+
         // User Login/Register Views
-        !isAdmin && React.createElement(React.Fragment, null,
+        !isAdmin && !isForgotPassword && React.createElement(React.Fragment, null,
             !isLogin && React.createElement('div', null,
                 React.createElement('label', { htmlFor: "fullName", className: "block text-sm font-medium text-brand-text-light mb-1" }, t.fullName),
                 React.createElement('input', {
@@ -74,7 +86,14 @@ const ModalContent = ({
                 type: "password", id: "password", name: "password", required: true,
                 value: formData.password, onChange: handleInputChange,
                 className: "w-full p-2 bg-dark-card-solid border border-dark-border rounded-full focus:ring-2 focus:ring-brand-purple focus:outline-none text-white"
-              })
+              }),
+              isLogin && React.createElement('div', { className: "flex justify-end mt-2" },
+                React.createElement('button', {
+                    type: "button",
+                    onClick: () => setViewMode('forgotPassword'),
+                    className: "text-xs text-brand-purple-light hover:text-white transition-colors focus:outline-none"
+                }, "Forgot Password?")
+              )
             ),
             !isLogin && React.createElement('div', null,
                 React.createElement('label', { htmlFor: "confirmPassword", className: "block text-sm font-medium text-brand-text-light mb-1" }, t.confirmPassword),
@@ -106,7 +125,7 @@ const ModalContent = ({
           disabled: loading,
           className: "w-full bg-button-gradient text-white font-bold py-2.5 px-4 rounded-full transition-opacity hover:opacity-90 mt-2 shadow-md shadow-brand-purple/20 flex justify-center items-center"
         },
-          loading ? React.createElement(Spinner, { size: '5' }) : (isAdmin ? "Unlock Dashboard" : (isLogin ? t.login : t.createAccount))
+          loading ? React.createElement(Spinner, { size: '5' }) : (isAdmin ? "Unlock Dashboard" : (isForgotPassword ? "Send Reset Link" : (isLogin ? t.login : t.createAccount)))
         )
       ),
 
@@ -120,7 +139,7 @@ const ModalContent = ({
       ),
 
       // Footer Links
-      isAdmin ? (
+      (isAdmin || isForgotPassword) ? (
          React.createElement('p', { className: "mt-6 text-center text-sm text-brand-text-light" },
             React.createElement('button', { onClick: () => setViewMode('login'), className: "font-medium text-brand-purple-light hover:underline" },
               "Back to User Login"
@@ -146,7 +165,7 @@ const ModalContent = ({
 
 const AuthModal = ({ isOpen, onClose, onLoginSuccess, onAdminLoginSuccess, language, setView, initialAdminMode = false }) => {
   const t = i18n[language];
-  const [viewMode, setViewMode] = useState('login'); // login, register, admin
+  const [viewMode, setViewMode] = useState('login'); // login, register, admin, forgotPassword
   const [formData, setFormData] = useState({ fullName: '', email: '', password: '', confirmPassword: '', adminPasskey: '' });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -179,6 +198,13 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess, onAdminLoginSuccess, langu
             } else {
                 throw new Error("Invalid Admin Passkey");
             }
+        } else if (viewMode === 'forgotPassword') {
+            // FORGOT PASSWORD
+            if (!formData.email) throw new Error("Email is required.");
+            const { error } = await resetPasswordForEmail(formData.email);
+            if (error) throw error;
+            setSuccess("Password reset link sent! Check your email.");
+            setTimeout(() => setViewMode('login'), 3000);
         } else if (viewMode === 'login') {
             // USER LOGIN
             const { data, error } = await signIn(formData.email, formData.password);

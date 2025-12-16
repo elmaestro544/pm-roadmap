@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { analyzeProjectRisks } from '../services/riskService.js';
-import { RiskIcon, Spinner, FeatureToolbar, PlusIcon, CloseIcon, ListIcon, BoardIcon, DocumentIcon, SearchIcon, FilterIcon, DownloadIcon } from './Shared.js'; // Assuming icons exist
+import { RiskIcon, Spinner, FeatureToolbar, PlusIcon, CloseIcon, ListIcon, BoardIcon, DocumentIcon, SearchIcon, FilterIcon, DownloadIcon, RefreshIcon, CheckIcon } from './Shared.js'; // Assuming icons exist
 import { i18n } from '../constants.js';
 
 // --- Helper Functions ---
@@ -201,7 +201,7 @@ const VisualRiskMap = ({ risks }) => {
     );
 };
 
-const RiskListView = ({ risks, onSelectRisk }) => {
+const RiskListView = ({ risks, onSelectRisk, selectedId }) => {
     const severityColors = {
         High: 'bg-red-500/10 text-red-400 border-red-500/20',
         Medium: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
@@ -218,7 +218,11 @@ const RiskListView = ({ risks, onSelectRisk }) => {
         React.createElement('div', { className: 'flex-grow overflow-y-auto p-2 space-y-2 scrollbar-thin' },
             risks.length === 0 ? React.createElement('p', { className: 'text-center text-slate-500 mt-10' }, "No risks identified yet.") :
             risks.map(risk =>
-                React.createElement('div', { key: risk.id, className: 'group p-3 rounded-lg bg-dark-bg border border-dark-border hover:border-brand-purple/50 transition-all cursor-pointer' },
+                React.createElement('div', { 
+                    key: risk.id, 
+                    onClick: () => onSelectRisk(risk),
+                    className: `group p-3 rounded-lg border transition-all cursor-pointer ${selectedId === risk.id ? 'bg-brand-purple/10 border-brand-purple' : 'bg-dark-bg border-dark-border hover:border-brand-purple/50'}` 
+                },
                     React.createElement('div', { className: 'flex justify-between items-start mb-1' },
                         React.createElement('h4', { className: 'font-semibold text-white text-sm line-clamp-1 group-hover:text-brand-purple-light' }, risk.title),
                         React.createElement('span', { className: `text-[10px] font-bold px-1.5 py-0.5 rounded border ${severityColors[risk.severity]}` }, risk.severity)
@@ -226,8 +230,61 @@ const RiskListView = ({ risks, onSelectRisk }) => {
                     React.createElement('p', { className: 'text-xs text-brand-text-light line-clamp-2 mb-2' }, risk.description),
                     React.createElement('div', { className: 'flex justify-between items-center text-[10px] text-slate-500' },
                         React.createElement('span', null, `Impact: ${risk.impact}`),
-                        React.createElement('span', null, new Date(risk.date).toLocaleDateString())
+                        React.createElement('button', { className: 'text-brand-purple-light hover:underline font-semibold' }, "View Analysis →")
                     )
+                )
+            )
+        )
+    );
+};
+
+const RiskDetailView = ({ risk, onBack }) => {
+    if (!risk) return null;
+
+    const severityColors = {
+        High: 'bg-red-500 text-white',
+        Medium: 'bg-yellow-500 text-black',
+        Low: 'bg-green-500 text-white',
+    };
+
+    return React.createElement('div', { className: 'bg-dark-card-solid border border-dark-border rounded-xl p-6 h-full flex flex-col overflow-y-auto' },
+        // Header
+        React.createElement('div', { className: 'flex items-start justify-between mb-6 pb-6 border-b border-dark-border' },
+            React.createElement('div', null,
+                React.createElement('h2', { className: 'text-2xl font-bold text-white mb-2' }, risk.title),
+                React.createElement('div', { className: 'flex items-center gap-3 text-sm' },
+                    React.createElement('span', { className: `px-2 py-0.5 rounded text-xs font-bold uppercase ${severityColors[risk.severity]}` }, risk.severity),
+                    React.createElement('span', { className: 'text-brand-text-light' }, `Project: ${risk.projectName || 'Current Project'}`),
+                    React.createElement('span', { className: 'text-brand-text-light' }, `Identified: ${risk.date}`)
+                )
+            ),
+            React.createElement('button', { 
+                onClick: onBack,
+                className: 'text-brand-text-light hover:text-white flex items-center gap-1 text-sm' 
+            }, "← Back to list")
+        ),
+
+        // Description
+        React.createElement('div', { className: 'mb-8' },
+            React.createElement('p', { className: 'text-lg text-brand-text-light leading-relaxed' }, risk.description)
+        ),
+
+        // Mitigation Strategies
+        React.createElement('div', null,
+            React.createElement('h3', { className: 'text-lg font-bold text-white mb-4' }, "Mitigation Strategies"),
+            React.createElement('div', { className: 'space-y-4' },
+                risk.mitigationStrategies && risk.mitigationStrategies.length > 0 ? (
+                    risk.mitigationStrategies.map((strategy, index) => (
+                        React.createElement('div', { key: index, className: 'bg-dark-bg border border-dark-border rounded-lg p-4 flex justify-between items-center' },
+                            React.createElement('div', { className: 'max-w-3xl' },
+                                React.createElement('h4', { className: 'font-bold text-white mb-1' }, strategy.name),
+                                React.createElement('p', { className: 'text-sm text-brand-text-light' }, strategy.description)
+                            ),
+                            React.createElement('button', { className: 'px-4 py-2 bg-button-gradient text-white text-sm font-bold rounded-lg hover:opacity-90 shadow-lg shadow-brand-purple/20' }, "Apply")
+                        )
+                    ))
+                ) : (
+                    React.createElement('p', { className: 'text-slate-500 italic' }, "No mitigation strategies generated for this risk.")
                 )
             )
         )
@@ -371,6 +428,7 @@ const RiskRegister = ({ risks }) => {
 const ResultsView = ({ data, onUpdate }) => {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [viewMode, setViewMode] = useState('dashboard'); // 'dashboard' | 'register'
+    const [selectedRisk, setSelectedRisk] = useState(null);
     const risks = data.risks || [];
 
     const summary = useMemo(() => {
@@ -396,7 +454,7 @@ const ResultsView = ({ data, onUpdate }) => {
                 // View Toggle
                 React.createElement('div', { className: 'flex bg-dark-bg p-1 rounded-lg border border-dark-border' },
                     React.createElement('button', {
-                        onClick: () => setViewMode('dashboard'),
+                        onClick: () => { setViewMode('dashboard'); setSelectedRisk(null); },
                         className: `px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${viewMode === 'dashboard' ? 'bg-brand-purple text-white shadow' : 'text-brand-text-light hover:text-white'}`
                     }, React.createElement(BoardIcon, { className: "w-4 h-4" }), "Dashboard"),
                     React.createElement('button', {
@@ -423,27 +481,42 @@ const ResultsView = ({ data, onUpdate }) => {
                 
                 // Left Column: List (3 cols) - Fixed width, scrollable
                 React.createElement('div', { className: 'lg:col-span-3 flex flex-col min-h-0 h-full' },
-                    React.createElement(RiskListView, { risks: risks })
+                    React.createElement(RiskListView, { 
+                        risks: risks, 
+                        onSelectRisk: setSelectedRisk,
+                        selectedId: selectedRisk?.id 
+                    })
                 ),
 
-                // Right Column: Visuals (9 cols) - Stacked vertically, scrollable parent
+                // Right Column: Visuals (9 cols) - Toggle between Dashboard & Details
                 React.createElement('div', { className: 'lg:col-span-9 flex flex-col gap-6 h-full overflow-y-auto pr-2 pb-6' },
-                    // 1. Stats Row
-                    React.createElement('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 flex-shrink-0' },
-                        React.createElement(StatCard, { label: 'Total Risks', value: summary.total, icon: '!', color: '#6366F1' }), // Indigo
-                        React.createElement(StatCard, { label: 'High Severity', value: summary.high, icon: '▲', color: '#EF4444' }), // Red
-                        React.createElement(StatCard, { label: 'Medium Severity', value: summary.medium, icon: '●', color: '#F59E0B' }), // Amber
-                        React.createElement(StatCard, { label: 'Closed Risks', value: summary.closed, icon: '✓', color: '#10B981' }) // Green
-                    ),
+                    selectedRisk ? (
+                        // Detailed View
+                        React.createElement(RiskDetailView, { 
+                            risk: selectedRisk, 
+                            onBack: () => setSelectedRisk(null) 
+                        })
+                    ) : (
+                        // Dashboard Overview
+                        React.createElement(React.Fragment, null,
+                            // 1. Stats Row
+                            React.createElement('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 flex-shrink-0' },
+                                React.createElement(StatCard, { label: 'Total Risks', value: summary.total, icon: '!', color: '#6366F1' }), // Indigo
+                                React.createElement(StatCard, { label: 'High Severity', value: summary.high, icon: '▲', color: '#EF4444' }), // Red
+                                React.createElement(StatCard, { label: 'Medium Severity', value: summary.medium, icon: '●', color: '#F59E0B' }), // Amber
+                                React.createElement(StatCard, { label: 'Closed Risks', value: summary.closed, icon: '✓', color: '#10B981' }) // Green
+                            ),
 
-                    // 2. Timeline Map (Wide)
-                    React.createElement('div', { className: 'flex-shrink-0' },
-                        React.createElement(VisualRiskMap, { risks: risks })
-                    ),
-                    
-                    // 3. Risk Matrix (Wide)
-                    React.createElement('div', { className: 'flex-shrink-0' },
-                        React.createElement(RiskMatrix, { risks: risks })
+                            // 2. Timeline Map (Wide)
+                            React.createElement('div', { className: 'flex-shrink-0' },
+                                React.createElement(VisualRiskMap, { risks: risks })
+                            ),
+                            
+                            // 3. Risk Matrix (Wide)
+                            React.createElement('div', { className: 'flex-shrink-0' },
+                                React.createElement(RiskMatrix, { risks: risks })
+                            )
+                        )
                     )
                 )
             )
@@ -473,20 +546,21 @@ const RiskView = ({ language, projectData, onUpdateProject, isLoading, setIsLoad
     const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.7));
     const handleExport = () => window.print();
 
+    const generate = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            const risk = await analyzeProjectRisks(projectData.objective);
+            onUpdateProject({ risk });
+        } catch (err) {
+            setError(err.message || "Failed to generate risk analysis.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
         if (projectData.objective && !projectData.risk && !isLoading) {
-             const generate = async () => {
-                try {
-                    setIsLoading(true);
-                    setError(null);
-                    const risk = await analyzeProjectRisks(projectData.objective);
-                    onUpdateProject({ risk });
-                } catch (err) {
-                    setError(err.message || "Failed to generate risk analysis.");
-                } finally {
-                    setIsLoading(false);
-                }
-            };
             generate();
         }
     }, [projectData.objective, projectData.risk, isLoading, onUpdateProject, setIsLoading, setError]);
@@ -501,13 +575,22 @@ const RiskView = ({ language, projectData, onUpdateProject, isLoading, setIsLoad
         return React.createElement(LoadingView, null);
     };
 
+    const customControls = (
+        React.createElement('button', {
+            onClick: generate,
+            className: 'p-2 rounded-md text-brand-text-light hover:bg-white/10 hover:text-white transition-colors',
+            title: "Regenerate Analysis"
+        }, React.createElement(RefreshIcon, { className: "h-5 w-5" }))
+    );
+
     return React.createElement('div', { ref: fullscreenRef, className: "h-full flex flex-col text-white bg-dark-card printable-container" },
         React.createElement(FeatureToolbar, {
             title: t.dashboardRisk,
             containerRef: fullscreenRef,
             onZoomIn: handleZoomIn,
             onZoomOut: handleZoomOut,
-            onExport: handleExport
+            onExport: handleExport,
+            customControls: customControls
         }),
         React.createElement('div', { className: 'flex-grow min-h-0 overflow-hidden' }, // Changed to overflow-hidden so children manage scroll
             React.createElement('div', {
