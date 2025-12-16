@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "build": "echo 'Runtime env.js ready for injection'",
-    "start": "node generate_env.js && npx serve -s ."
+    "start": "npx serve -s ."
   },
   "keywords": [
     "ai",
