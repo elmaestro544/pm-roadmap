@@ -60,7 +60,6 @@ const KpiCard = ({ title, value, unit, description, color = 'text-brand-purple-l
 
 const ResultsView = ({ data, currency }) => {
     const { kpis, analysis } = data;
-
     const spiColor = kpis.spi >= 1.0 ? 'text-green-400' : 'text-red-400';
     const cpiColor = kpis.cpi >= 1.0 ? 'text-green-400' : 'text-red-400';
     const svColor = kpis.scheduleVariance >= 0 ? 'text-green-400' : 'text-red-400';
@@ -107,7 +106,8 @@ const KpiView = ({ language, projectData, onUpdateProject, isLoading, setIsLoadi
     const currency = projectData.criteria?.currency || 'USD';
     
     useEffect(() => {
-        if (projectData.schedule && projectData.budget && !projectData.kpiReport && !isLoading) {
+        // Breaking the loop: Only trigger if data exists, no report yet, aren't already loading, AND no error present.
+        if (projectData.schedule && projectData.budget && !projectData.kpiReport && !isLoading && !error) {
              const generate = async () => {
                 try {
                     setIsLoading(true);
@@ -122,7 +122,7 @@ const KpiView = ({ language, projectData, onUpdateProject, isLoading, setIsLoadi
             };
             generate();
         }
-    }, [projectData.schedule, projectData.budget, projectData.kpiReport, isLoading, onUpdateProject, setIsLoading, setError]);
+    }, [projectData.schedule, projectData.budget, projectData.kpiReport, isLoading, error]); // Added error to dependencies
 
 
     const renderContent = () => {

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { i18n } from '../constants.js';
 import { generateProjectPlan } from '../services/planningService.js';
@@ -357,14 +358,14 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
     };
     const handleExport = () => window.print();
 
-    // Effect to auto-generate plan when objective is set (if coming from Consulting Plan)
+    // Effect to auto-generate plan when objective is set
     useEffect(() => {
-        if (projectData.objective && !projectData.plan && !isLoading) {
+        // Breaking the loop: Only trigger if we have an objective, no plan, we aren't loading, AND no current error.
+        if (projectData.objective && !projectData.plan && !isLoading && !error) {
             const generate = async () => {
                 try {
                     setIsLoading(true);
                     setError(null);
-                    // Pass explicit criteria if available from previous step
                     const plan = await generateProjectPlan(projectData.objective, projectData.criteria);
                     onUpdateProject({ plan });
                 } catch (err) {
@@ -375,7 +376,7 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
             };
             generate();
         }
-    }, [projectData.objective, projectData.plan, projectData.criteria, isLoading, onUpdateProject, setIsLoading, setError]);
+    }, [projectData.objective, projectData.plan, projectData.criteria, isLoading, error]); // added error to dependencies
 
     const hasPlan = !!localPlan;
 
@@ -396,8 +397,6 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
 
     const handleUpdateLocalPlan = (newPlan) => {
         setLocalPlan(newPlan);
-        // We don't auto-save on every keystroke in Edit Mode, only on toggle off or specific actions, 
-        // but for safety we can save debounced or on blur. Here we rely on toggle off or explicit actions.
     };
 
     const renderContent = () => {
@@ -405,7 +404,6 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
             return React.createElement(InputView, {
                 onGenerate: (objective, budget, currency, duration) => {
                     const criteria = { budget, currency, duration, budgetType: budget ? 'Fixed' : 'Predicted' };
-                    // Save both objective and criteria to be used by this and future steps
                     onUpdateProject({ objective, criteria });
                 },
                 isLoading,
@@ -423,7 +421,6 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
                 onOpenAddModal: (type) => setModalConfig({ isOpen: true, type })
             });
         }
-        // Fallback for error state where objective exists but plan failed
         return React.createElement(InputView, {
              onGenerate: (objective, budget, currency, duration) => {
                  const criteria = { budget, currency, duration, budgetType: budget ? 'Fixed' : 'Predicted' };
@@ -449,7 +446,7 @@ const PlanningView = ({ language, projectData, onUpdateProject, onResetProject, 
                ref: contentRef,
                className: 'p-6 printable-content w-full pb-32', 
                style: { transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.2s ease', width: '100%' },
-               contentEditable: false, // Managed inputs internally
+               contentEditable: false,
                suppressContentEditableWarning: true
            },
                !hasPlan && !isLoading 

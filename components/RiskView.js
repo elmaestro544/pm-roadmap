@@ -3,14 +3,8 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { analyzeProjectRisks } from '../services/riskService.js';
-import { RiskIcon, Spinner, FeatureToolbar, PlusIcon, CloseIcon, ListIcon, BoardIcon, DocumentIcon, SearchIcon, FilterIcon, DownloadIcon, RefreshIcon, CheckIcon } from './Shared.js'; // Assuming icons exist
+import { RiskIcon, Spinner, FeatureToolbar, PlusIcon, CloseIcon, ListIcon, BoardIcon, DocumentIcon, SearchIcon, FilterIcon, DownloadIcon, RefreshIcon, CheckIcon } from './Shared.js'; 
 import { i18n } from '../constants.js';
-
-// --- Helper Functions ---
-const getMonthName = (dateStr) => {
-    const date = new Date(dateStr);
-    return date.toLocaleString('default', { month: 'short' });
-};
 
 // --- Sub-Components ---
 
@@ -102,53 +96,40 @@ const AddRiskModal = ({ isOpen, onClose, onAdd }) => {
 };
 
 const VisualRiskMap = ({ risks }) => {
-    // 1. Determine Timeline Range
     const dates = risks.flatMap(r => [new Date(r.startDate || new Date()), new Date(r.endDate || new Date())]);
     if (dates.length === 0) dates.push(new Date());
-    
     const minDate = new Date(Math.min(...dates));
     const maxDate = new Date(Math.max(...dates));
-    
-    // Add buffer
     minDate.setDate(1);
     maxDate.setMonth(maxDate.getMonth() + 1);
     maxDate.setDate(0);
-
     const totalDuration = maxDate - minDate;
-    
-    // Generate Months labels
     const months = [];
     let curr = new Date(minDate);
     while (curr <= maxDate) {
         months.push(new Date(curr));
         curr.setMonth(curr.getMonth() + 1);
     }
-
     const getPosition = (dateStr) => {
         const d = new Date(dateStr || new Date());
         return ((d - minDate) / totalDuration) * 100;
     };
-
     const getWidth = (startStr, endStr) => {
         const s = new Date(startStr || new Date());
         const e = new Date(endStr || new Date());
         return ((e - s) / totalDuration) * 100;
     };
-
     const severityGroups = {
         'High': risks.filter(r => r.severity === 'High'),
         'Medium': risks.filter(r => r.severity === 'Medium'),
         'Low': risks.filter(r => r.severity === 'Low')
     };
-
     return React.createElement('div', { className: 'bg-dark-card-solid border border-dark-border rounded-xl p-6 flex flex-col h-[300px]' },
         React.createElement('h3', { className: 'font-bold text-white mb-6 flex items-center gap-2' }, 
             React.createElement('span', { className: 'w-1 h-5 bg-brand-purple rounded-full' }),
             'Risk Timeline Map'
         ),
-        
         React.createElement('div', { className: 'flex-grow relative flex' },
-            // Y-Axis Labels (Swimlanes)
             React.createElement('div', { className: 'w-16 flex flex-col justify-between border-r border-dark-border pr-2 py-4' },
                 ['High', 'Medium', 'Low'].map(sev => 
                     React.createElement('div', { key: sev, className: `flex-1 flex items-center justify-center` },
@@ -156,19 +137,13 @@ const VisualRiskMap = ({ risks }) => {
                     )
                 )
             ),
-            
-            // Chart Area
             React.createElement('div', { className: 'flex-grow relative border-l border-dark-border ml-2 overflow-hidden' },
-                // Grid Lines (Vertical Months)
                 React.createElement('div', { className: 'absolute inset-0 flex justify-between pointer-events-none' },
                     months.map((m, i) => React.createElement('div', { key: i, className: 'h-full border-r border-dashed border-white/5 w-full last:border-r-0' }))
                 ),
-
-                // Swimlanes
                 ['High', 'Medium', 'Low'].map((sev, idx) => (
                     React.createElement('div', { key: sev, className: 'h-1/3 w-full relative border-b border-white/5 last:border-b-0' },
                         severityGroups[sev].map((risk, rIdx) => {
-                            // Simple staggering to avoid overlap
                             const topOffset = (rIdx % 3) * 30 + 10; 
                             return React.createElement('div', {
                                 key: risk.id,
@@ -193,8 +168,6 @@ const VisualRiskMap = ({ risks }) => {
                 ))
             )
         ),
-        
-        // X-Axis Labels
         React.createElement('div', { className: 'flex justify-between pl-20 pt-2 text-xs text-brand-text-light border-t border-dark-border/50 mt-1' },
             months.filter((_, i) => i % 2 === 0).map((m, i) => React.createElement('span', { key: i }, m.toLocaleString('default', { month: 'short', year: '2-digit' })))
         )
@@ -207,7 +180,6 @@ const RiskListView = ({ risks, onSelectRisk, selectedId }) => {
         Medium: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
         Low: 'bg-green-500/10 text-green-400 border-green-500/20',
     };
-
     return React.createElement('div', { className: 'h-full flex flex-col bg-dark-card-solid border border-dark-border rounded-xl overflow-hidden' },
         React.createElement('div', { className: 'p-4 border-b border-dark-border bg-dark-card/50 flex-shrink-0' },
             React.createElement('h3', { className: 'font-bold text-white flex items-center gap-2' }, 
@@ -240,15 +212,8 @@ const RiskListView = ({ risks, onSelectRisk, selectedId }) => {
 
 const RiskDetailView = ({ risk, onBack }) => {
     if (!risk) return null;
-
-    const severityColors = {
-        High: 'bg-red-500 text-white',
-        Medium: 'bg-yellow-500 text-black',
-        Low: 'bg-green-500 text-white',
-    };
-
+    const severityColors = { High: 'bg-red-500 text-white', Medium: 'bg-yellow-500 text-black', Low: 'bg-green-500 text-white' };
     return React.createElement('div', { className: 'bg-dark-card-solid border border-dark-border rounded-xl p-6 h-full flex flex-col overflow-y-auto' },
-        // Header
         React.createElement('div', { className: 'flex items-start justify-between mb-6 pb-6 border-b border-dark-border' },
             React.createElement('div', null,
                 React.createElement('h2', { className: 'text-2xl font-bold text-white mb-2' }, risk.title),
@@ -258,18 +223,9 @@ const RiskDetailView = ({ risk, onBack }) => {
                     React.createElement('span', { className: 'text-brand-text-light' }, `Identified: ${risk.date}`)
                 )
             ),
-            React.createElement('button', { 
-                onClick: onBack,
-                className: 'text-brand-text-light hover:text-white flex items-center gap-1 text-sm' 
-            }, "← Back to list")
+            React.createElement('button', { onClick: onBack, className: 'text-brand-text-light hover:text-white flex items-center gap-1 text-sm' }, "← Back to list")
         ),
-
-        // Description
-        React.createElement('div', { className: 'mb-8' },
-            React.createElement('p', { className: 'text-lg text-brand-text-light leading-relaxed' }, risk.description)
-        ),
-
-        // Mitigation Strategies
+        React.createElement('div', { className: 'mb-8' }, React.createElement('p', { className: 'text-lg text-brand-text-light leading-relaxed' }, risk.description)),
         React.createElement('div', null,
             React.createElement('h3', { className: 'text-lg font-bold text-white mb-4' }, "Mitigation Strategies"),
             React.createElement('div', { className: 'space-y-4' },
@@ -283,9 +239,7 @@ const RiskDetailView = ({ risk, onBack }) => {
                             React.createElement('button', { className: 'px-4 py-2 bg-button-gradient text-white text-sm font-bold rounded-lg hover:opacity-90 shadow-lg shadow-brand-purple/20' }, "Apply")
                         )
                     ))
-                ) : (
-                    React.createElement('p', { className: 'text-slate-500 italic' }, "No mitigation strategies generated for this risk.")
-                )
+                ) : (React.createElement('p', { className: 'text-slate-500 italic' }, "No mitigation strategies generated for this risk."))
             )
         )
     );
@@ -294,7 +248,6 @@ const RiskDetailView = ({ risk, onBack }) => {
 const RiskMatrix = ({ risks }) => {
     const likelihoods = ['Rare', 'Unlikely', 'Possible', 'Likely', 'Certain'];
     const impacts = ['Minor', 'Moderate', 'Major', 'Critical'];
-    
     const matrixData = useMemo(() => {
         const grid = {};
         impacts.forEach(i => likelihoods.forEach(l => grid[`${i}-${l}`] = []));
@@ -304,17 +257,14 @@ const RiskMatrix = ({ risks }) => {
         });
         return grid;
     }, [risks]);
-
     const getCellColor = (rowIdx, colIdx) => {
         const impactScore = 4 - rowIdx;
         const probScore = colIdx + 1;
         const riskScore = impactScore * probScore; 
-        
         if (riskScore >= 12) return 'bg-red-500/20 border-red-500/30 text-red-100 hover:bg-red-500/40';
         if (riskScore >= 6) return 'bg-yellow-500/20 border-yellow-500/30 text-yellow-100 hover:bg-yellow-500/40';
         return 'bg-green-500/20 border-green-500/30 text-green-100 hover:bg-green-500/40';
     };
-
     return React.createElement('div', { className: 'bg-dark-card-solid border border-dark-border rounded-xl p-6 w-full' },
         React.createElement('div', { className: 'flex items-center justify-between mb-6' },
             React.createElement('h3', { className: 'font-bold text-white flex items-center gap-2' }, 
@@ -322,9 +272,7 @@ const RiskMatrix = ({ risks }) => {
                 'Risk Matrix Analysis'
             )
         ),
-        
         React.createElement('div', { className: 'flex flex-col' },
-            // Top Headers (Likelihood)
             React.createElement('div', { className: 'flex mb-2' },
                 React.createElement('div', { className: 'w-32 flex-shrink-0 flex items-end justify-end pr-4 pb-2' },
                     React.createElement('span', { className: 'text-xs font-bold text-brand-text-light uppercase tracking-widest' }, "Severity")
@@ -334,22 +282,17 @@ const RiskMatrix = ({ risks }) => {
                     ...likelihoods.map(l => React.createElement('div', { key: l, className: 'text-center text-xs font-bold text-white uppercase bg-dark-bg py-1 rounded' }, l))
                 )
             ),
-
             React.createElement('div', { className: 'flex' },
-                // Left Headers (Impact/Severity)
                 React.createElement('div', { className: 'w-32 flex-shrink-0 flex flex-col gap-1 pr-2' },
                     impacts.slice().reverse().map(i => 
                         React.createElement('div', { key: i, className: 'h-24 flex items-center justify-end px-3 text-xs font-bold text-white uppercase bg-dark-bg rounded' }, i)
                     )
                 ),
-                
-                // Matrix Grid
                 React.createElement('div', { className: 'flex-grow grid grid-cols-5 grid-rows-4 gap-1' },
                     impacts.slice().reverse().map((impact, rowIdx) => 
                         likelihoods.map((likelihood, colIdx) => {
                             const key = `${impact}-${likelihood}`;
                             const items = matrixData[key] || [];
-                            
                             return React.createElement('div', { 
                                 key: key,
                                 className: `relative border rounded transition-all p-2 h-24 overflow-y-auto scrollbar-thin ${getCellColor(rowIdx, colIdx)}`
@@ -357,9 +300,7 @@ const RiskMatrix = ({ risks }) => {
                                 items.length > 0 && (
                                     React.createElement('div', { className: 'flex flex-col gap-1' },
                                         React.createElement('span', { className: 'text-[10px] font-bold opacity-70 mb-1' }, items.length),
-                                        items.map(r => 
-                                            React.createElement('div', { key: r.id, className: 'text-[10px] leading-tight truncate' }, `• ${r.title}`)
-                                        )
+                                        items.map(r => React.createElement('div', { key: r.id, className: 'text-[10px] leading-tight truncate' }, `• ${r.title}`))
                                     )
                                 )
                             );
@@ -392,7 +333,7 @@ const RiskRegister = ({ risks }) => {
                 React.createElement(DownloadIcon, { className: "w-3 h-3" }), "Export CSV"
             )
         ),
-        React.createElement('div', { className: 'flex-grow overflow-auto' }, // Allow vertical scrolling here
+        React.createElement('div', { className: 'flex-grow overflow-auto' }, 
             React.createElement('table', { className: 'w-full text-sm text-left' },
                 React.createElement('thead', { className: 'bg-dark-bg text-brand-text-light font-semibold border-b border-dark-border sticky top-0' },
                     React.createElement('tr', null,
@@ -427,31 +368,25 @@ const RiskRegister = ({ risks }) => {
 
 const ResultsView = ({ data, onUpdate }) => {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [viewMode, setViewMode] = useState('dashboard'); // 'dashboard' | 'register'
+    const [viewMode, setViewMode] = useState('dashboard'); 
     const [selectedRisk, setSelectedRisk] = useState(null);
     const risks = data.risks || [];
-
     const summary = useMemo(() => {
         const high = risks.filter(r => r.severity === 'High').length;
         const medium = risks.filter(r => r.severity === 'Medium').length;
         return { total: risks.length, high, medium, closed: 0 };
     }, [risks]);
-
     const handleAddRisk = (newRisk) => {
         const updatedRisks = [newRisk, ...risks];
         onUpdate({ ...data, risks: updatedRisks });
     };
-
     return React.createElement('div', { className: 'w-full h-full flex flex-col gap-6 animate-fade-in-up' },
-        
-        // --- Top Bar ---
         React.createElement('div', { className: 'flex-shrink-0 flex justify-between items-center bg-dark-card-solid border border-dark-border p-4 rounded-xl shadow-lg' },
             React.createElement('div', null,
                 React.createElement('h2', { className: 'text-2xl font-bold text-white' }, "Risk & Issue Management"),
                 React.createElement('p', { className: 'text-brand-text-light text-sm' }, "Monitor, assess, and mitigate project uncertainties.")
             ),
             React.createElement('div', { className: 'flex items-center gap-4' },
-                // View Toggle
                 React.createElement('div', { className: 'flex bg-dark-bg p-1 rounded-lg border border-dark-border' },
                     React.createElement('button', {
                         onClick: () => { setViewMode('dashboard'); setSelectedRisk(null); },
@@ -462,9 +397,7 @@ const ResultsView = ({ data, onUpdate }) => {
                         className: `px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${viewMode === 'register' ? 'bg-brand-purple text-white shadow' : 'text-brand-text-light hover:text-white'}`
                     }, React.createElement(ListIcon, { className: "w-4 h-4" }), "Register")
                 ),
-                
                 React.createElement('div', { className: 'w-px h-8 bg-dark-border' }),
-
                 React.createElement('button', { 
                     onClick: () => setIsAddModalOpen(true),
                     className: 'flex items-center gap-2 px-4 py-2 bg-button-gradient text-white rounded-lg font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-brand-purple/20' 
@@ -474,12 +407,8 @@ const ResultsView = ({ data, onUpdate }) => {
                 )
             )
         ),
-
-        // --- Main Content ---
         viewMode === 'dashboard' ? (
             React.createElement('div', { className: 'flex-grow grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0' },
-                
-                // Left Column: List (3 cols) - Fixed width, scrollable
                 React.createElement('div', { className: 'lg:col-span-3 flex flex-col min-h-0 h-full' },
                     React.createElement(RiskListView, { 
                         risks: risks, 
@@ -487,46 +416,31 @@ const ResultsView = ({ data, onUpdate }) => {
                         selectedId: selectedRisk?.id 
                     })
                 ),
-
-                // Right Column: Visuals (9 cols) - Toggle between Dashboard & Details
                 React.createElement('div', { className: 'lg:col-span-9 flex flex-col gap-6 h-full overflow-y-auto pr-2 pb-6' },
                     selectedRisk ? (
-                        // Detailed View
                         React.createElement(RiskDetailView, { 
                             risk: selectedRisk, 
                             onBack: () => setSelectedRisk(null) 
                         })
                     ) : (
-                        // Dashboard Overview
                         React.createElement(React.Fragment, null,
-                            // 1. Stats Row
                             React.createElement('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 flex-shrink-0' },
-                                React.createElement(StatCard, { label: 'Total Risks', value: summary.total, icon: '!', color: '#6366F1' }), // Indigo
-                                React.createElement(StatCard, { label: 'High Severity', value: summary.high, icon: '▲', color: '#EF4444' }), // Red
-                                React.createElement(StatCard, { label: 'Medium Severity', value: summary.medium, icon: '●', color: '#F59E0B' }), // Amber
-                                React.createElement(StatCard, { label: 'Closed Risks', value: summary.closed, icon: '✓', color: '#10B981' }) // Green
+                                React.createElement(StatCard, { label: 'Total Risks', value: summary.total, icon: '!', color: '#6366F1' }), 
+                                React.createElement(StatCard, { label: 'High Severity', value: summary.high, icon: '▲', color: '#EF4444' }), 
+                                React.createElement(StatCard, { label: 'Medium Severity', value: summary.medium, icon: '●', color: '#F59E0B' }), 
+                                React.createElement(StatCard, { label: 'Closed Risks', value: summary.closed, icon: '✓', color: '#10B981' }) 
                             ),
-
-                            // 2. Timeline Map (Wide)
-                            React.createElement('div', { className: 'flex-shrink-0' },
-                                React.createElement(VisualRiskMap, { risks: risks })
-                            ),
-                            
-                            // 3. Risk Matrix (Wide)
-                            React.createElement('div', { className: 'flex-shrink-0' },
-                                React.createElement(RiskMatrix, { risks: risks })
-                            )
+                            React.createElement('div', { className: 'flex-shrink-0' }, React.createElement(VisualRiskMap, { risks: risks })),
+                            React.createElement('div', { className: 'flex-shrink-0' }, React.createElement(RiskMatrix, { risks: risks }))
                         )
                     )
                 )
             )
         ) : (
-            // Register View - Ensure it takes full height and scrolls
             React.createElement('div', { className: 'flex-grow overflow-hidden flex flex-col h-full' },
                 React.createElement(RiskRegister, { risks: risks })
             )
         ),
-        
         React.createElement(AddRiskModal, { 
             isOpen: isAddModalOpen, 
             onClose: () => setIsAddModalOpen(false), 
@@ -539,8 +453,6 @@ const ResultsView = ({ data, onUpdate }) => {
 const RiskView = ({ language, projectData, onUpdateProject, isLoading, setIsLoading, error, setError }) => {
     const t = i18n[language];
     const fullscreenRef = useRef(null);
-    
-    // Toolbar state
     const [zoomLevel, setZoomLevel] = useState(1);
     const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 1.5));
     const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.7));
@@ -560,10 +472,11 @@ const RiskView = ({ language, projectData, onUpdateProject, isLoading, setIsLoad
     };
 
     useEffect(() => {
-        if (projectData.objective && !projectData.risk && !isLoading) {
+        // Breaking the loop: Only trigger if we have an objective, no risk data, aren't already loading, AND no error present.
+        if (projectData.objective && !projectData.risk && !isLoading && !error) {
             generate();
         }
-    }, [projectData.objective, projectData.risk, isLoading, onUpdateProject, setIsLoading, setError]);
+    }, [projectData.objective, projectData.risk, isLoading, error]); // Added error to dependencies
 
     const handleUpdateRisks = (updatedRiskData) => {
         onUpdateProject({ risk: updatedRiskData });
@@ -592,7 +505,7 @@ const RiskView = ({ language, projectData, onUpdateProject, isLoading, setIsLoad
             onExport: handleExport,
             customControls: customControls
         }),
-        React.createElement('div', { className: 'flex-grow min-h-0 overflow-hidden' }, // Changed to overflow-hidden so children manage scroll
+        React.createElement('div', { className: 'flex-grow min-h-0 overflow-hidden' }, 
             React.createElement('div', {
                className: 'p-6 printable-content h-full flex flex-col',
                style: { transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.2s ease' }

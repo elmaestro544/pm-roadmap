@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { getUserSettings, getEnv } from "./supabaseClient.js";
 
@@ -141,7 +142,6 @@ const generateGoogleContent = async (client, model, prompt, schema, systemInstru
         config.responseSchema = schema;
     }
 
-    // Google SDK handles its own retries internally usually, but we wrap in try/catch
     try {
         const result = await client.models.generateContent({
             model: model,
@@ -151,10 +151,23 @@ const generateGoogleContent = async (client, model, prompt, schema, systemInstru
         return result.text;
     } catch (e) {
         console.error("Google AI generation failed:", e);
-        if (e.message.includes('fetch')) {
-             throw new Error("Network error connecting to Google AI. Please check your connection.");
+        
+        let errorMessage = e.message || "Unknown error";
+        
+        // Handle 429 explicitly for better UI feedback
+        if (errorMessage.includes('429')) {
+            errorMessage = "API Rate Limit Exceeded (429). You are on the Gemini Free Tier which allows only a few requests per minute. Please wait 60 seconds and try again, or use a paid API key.";
+        } else if (errorMessage.includes('fetch')) {
+            errorMessage = "Network error connecting to Google AI. Please check your connection.";
+        } else if (typeof e === 'object' && e !== null) {
+            // Try to extract a cleaner message if it's a JSON string from the SDK
+            try {
+                const parsed = JSON.parse(errorMessage);
+                if (parsed.error?.message) errorMessage = parsed.error.message;
+            } catch (ignore) {}
         }
-        throw new Error(`Google AI Error: ${e.message}`);
+        
+        throw new Error(errorMessage);
     }
 };
 

@@ -1,3 +1,4 @@
+
 // components/BudgetView.js
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -95,11 +96,9 @@ const BudgetView = ({ language, projectData, onUpdateProject, isLoading, setIsLo
         try {
             setIsLoading(true);
             setError(null);
-            // Pass criteria to budget service
             const budget = await generateProjectBudget({
                 objectives: projectData.objective,
                 scope: "A standard project scope including planning, execution, and closure.",
-                // Fallback values if criteria is missing
                 currency: currency,
                 contingency: '15'
             }, projectData.criteria);
@@ -112,10 +111,11 @@ const BudgetView = ({ language, projectData, onUpdateProject, isLoading, setIsLo
     };
 
     useEffect(() => {
-        if (projectData.objective && !projectData.budget && !isLoading) {
+        // Breaking the loop: Only trigger if we have an objective, no budget, aren't already loading, AND no error present.
+        if (projectData.objective && !projectData.budget && !isLoading && !error) {
              generate();
         }
-    }, [projectData.objective, projectData.budget, isLoading]); // Reduced deps to avoid loops
+    }, [projectData.objective, projectData.budget, isLoading, error]); // Added error to dependencies
 
     const renderContent = () => {
         if (isLoading) return React.createElement(LoadingView, null);

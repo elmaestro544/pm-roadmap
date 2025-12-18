@@ -156,15 +156,8 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                 taskWithColor.level = 0; 
             }
 
-            // Primavera P6 Color Logic
-            // Project/WBS Summary: Yellow/Gold
-            // Critical Task: Red
-            // Standard Task: Green
-            // Actual Work (Progress): Blue (Handled in render)
-
             if (task.type === 'project' || task.id === 'ROOT-SUMMARY') {
-                taskWithColor.color = '#F59E0B'; // P6 WBS/Summary Yellow (Amber-500)
-                // WBS bands often black with yellow in P6, but yellow bar is common for baseline/summary in some layouts
+                taskWithColor.color = '#F59E0B'; 
             } else if (task.type === 'task') {
                 let visible = true;
                 if (sortMode === 'wbs') {
@@ -175,9 +168,9 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                 
                 if (visible) {
                     if (task.isCritical) {
-                        taskWithColor.color = '#EF4444'; // P6 Critical Red (Red-500)
+                        taskWithColor.color = '#EF4444'; 
                     } else {
-                        taskWithColor.color = '#10B981'; // P6 Standard Green (Emerald-500)
+                        taskWithColor.color = '#10B981'; 
                     }
                 } else {
                     return; 
@@ -238,22 +231,17 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                 const endX = getLeftPos(task.start) + 2; 
                 const endY = taskYMap.get(task.id);
 
-                // For each predecessor
                 task.dependencies.forEach(depId => {
                     const predTask = tasks.find(t => t.id === depId);
                     if (predTask && taskYMap.has(task.id) && taskYMap.has(depId)) {
                         const startY = taskYMap.get(depId);
                         const startX = getLeftPos(predTask.start) + getWidth(predTask.start, predTask.end);
                         
-                        // Orthogonal Path Logic
                         const x1 = startX;
                         const y1 = startY;
                         const x2 = endX;
                         const y2 = endY;
-                        
                         const midX = x1 + 10;
-                        
-                        // Highlight line if part of critical path
                         const isCrit = task.isCritical && predTask.isCritical;
                         const strokeColor = isCrit ? '#EF4444' : '#94A3B8';
                         const strokeWidth = isCrit ? '2' : '1.5';
@@ -280,10 +268,7 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
 
     return React.createElement('div', { className: 'h-full w-full overflow-auto bg-dark-bg relative border border-dark-border rounded-xl scrollbar-thin' },
         React.createElement('div', { className: 'min-w-fit flex flex-col relative' },
-            
-            // --- Sticky Header Section ---
             React.createElement('div', { className: 'sticky top-0 z-30 bg-dark-card-solid border-b border-dark-border shadow-md' },
-                // Row 1: Month/Year Grouping
                 React.createElement('div', { className: 'flex h-9 border-b border-dark-border/50' },
                      React.createElement('div', { 
                         className: 'sticky left-0 z-40 bg-dark-card-solid border-r border-dark-border flex-shrink-0',
@@ -297,14 +282,11 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                         }, group.label)
                     )
                 ),
-                
-                // Row 2: Days/Weeks scale
                 React.createElement('div', { className: 'flex h-9' },
                     React.createElement('div', { 
                         className: 'sticky left-0 z-40 bg-dark-card-solid border-r border-dark-border flex flex-shrink-0',
                         style: { width: taskListWidth }
                     },
-                        // Name Column Header
                         React.createElement('div', { 
                             className: 'flex items-center justify-between px-4 font-bold text-white text-sm border-r border-dark-border/30',
                             style: { width: nameColumnWidth }
@@ -320,7 +302,6 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                                     : React.createElement(ChevronRightIcon, { className: "w-4 h-4" })
                             )
                         ),
-                        // Detailed Column Headers
                         showDetails && detailedColumns.map(col => 
                             React.createElement('div', {
                                 key: col.id,
@@ -329,7 +310,6 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                             }, col.label)
                         )
                     ),
-                    
                     periods.map((p, i) => 
                         React.createElement('div', { 
                             key: i, 
@@ -344,8 +324,6 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                     )
                 )
             ),
-
-            // --- Body Grid ---
             React.createElement('div', { 
                 className: 'absolute top-[72px] bottom-0 flex pointer-events-none z-0',
                 style: { left: taskListWidth } 
@@ -358,7 +336,6 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                     })
                 )
             ),
-
             React.createElement('svg', { 
                 className: 'absolute top-[72px] pointer-events-none z-10 w-full h-full',
                 style: { left: taskListWidth }
@@ -382,7 +359,6 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                     )
                 )
             ),
-
             visibleTasks.map(task => {
                 const isProject = task.type === 'project';
                 const isSummary = task.id === 'ROOT-SUMMARY';
@@ -391,18 +367,15 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                 const level = task.level || 0;
                 
                 return React.createElement('div', { key: task.id, className: `flex hover:bg-white/5 transition-colors relative group ${isSummary ? 'bg-dark-card-solid border-b border-dark-border' : ''}`, style: { height: rowHeight } },
-                    
                     React.createElement('div', { 
                         className: `sticky left-0 z-20 flex-shrink-0 border-r border-dark-border flex items-center overflow-hidden shadow-[4px_0_10px_rgba(0,0,0,0.3)] ${isProject || isSummary ? 'bg-dark-card-solid' : 'bg-dark-card'}`,
                         style: { width: taskListWidth }
                     },
-                        // Name Cell
                         React.createElement('div', { 
                             className: 'flex items-center px-4 gap-2 h-full border-r border-dark-border/30',
                             style: { width: nameColumnWidth }
                         },
-                            React.createElement('div', { style: { width: level * 16 } }), // Indentation based on robust hierarchy
-                            // Toggle Button only for Projects in WBS mode
+                            React.createElement('div', { style: { width: level * 16 } }), 
                             (isProject && sortMode === 'wbs') && React.createElement('button', { 
                                 onClick: () => onToggle(task.id),
                                 className: 'p-0.5 hover:text-white text-brand-purple-light focus:outline-none'
@@ -412,7 +385,6 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                                 className: `truncate text-sm ${isSummary ? 'font-extrabold text-brand-purple-light uppercase' : isProject ? 'font-bold text-white' : 'font-medium text-brand-text-light'}` 
                             }, task.name)
                         ),
-                        // Detail Cells
                         showDetails && detailedColumns.map(col => 
                             React.createElement('div', {
                                 key: col.id,
@@ -421,7 +393,6 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                             }, col.render(task))
                         )
                     ),
-
                     React.createElement('div', { className: 'relative flex-grow z-20 py-2' }, 
                         React.createElement('div', {
                             className: `absolute top-1/2 -translate-y-1/2 rounded shadow-md text-[10px] text-white whitespace-nowrap overflow-visible flex items-center cursor-pointer transition-all hover:brightness-110 ${task.isCritical && !isProject ? 'ring-1 ring-red-500/50' : ''}`,
@@ -430,20 +401,16 @@ const TimelineView = ({ tasks, expanded, onToggle, scale, zoom, isEditing, onUpd
                                 width: width,
                                 backgroundColor: task.color, 
                                 opacity: isProject ? 1 : 0.9,
-                                height: isProject ? '14px' : '22px' // Thinner bars for summary/project
+                                height: isProject ? '14px' : '22px' 
                             }
                         },
-                            // P6 Style Progress Overlay (Blue)
                             !isProject && task.progress > 0 && React.createElement('div', {
                                 className: 'absolute top-0 left-0 bottom-0 bg-blue-500 z-10 rounded-l',
                                 style: { width: `${task.progress}%` }
                             }),
-
                             !isProject && !isSummary && React.createElement('span', { 
                                 className: 'absolute left-full ml-2 text-xs text-brand-text-light font-medium truncate pointer-events-none' 
                             }, task.resource),
-
-                            // Progress Text on Bar
                             React.createElement('span', { className: `relative z-20 px-2 drop-shadow-md font-semibold ${width < 30 ? 'hidden' : ''}` },
                                 `${task.progress}%`
                             )
@@ -506,7 +473,6 @@ const BoardView = ({ tasks }) => {
 };
 
 const EditableListView = ({ tasks, onUpdate, currency, groupBy, showCriticalPath }) => {
-    // Process data based on grouping
     const displayData = useMemo(() => {
         let filteredTasks = tasks;
         if (showCriticalPath) {
@@ -514,16 +480,13 @@ const EditableListView = ({ tasks, onUpdate, currency, groupBy, showCriticalPath
         }
 
         if (groupBy === 'wbs') {
-            // Tasks already sorted hierarchically by service, preserving that order.
-            // Just map to include 'isHeader' false for all, indentation handled by renderer
             return filteredTasks.map(t => ({ ...t, isHeader: false, depth: t.level || 0 }));
         } else {
-            // Group by Field (Resource, Status)
             const groups = {};
             const result = [];
             
             filteredTasks.forEach(task => {
-                if (task.type === 'project' && task.id === 'ROOT-SUMMARY') return; // Skip root summary in categorical grouping
+                if (task.type === 'project' && task.id === 'ROOT-SUMMARY') return; 
                 
                 let key = 'Unassigned';
                 if (groupBy === 'resource') key = task.resource || 'Unassigned';
@@ -538,16 +501,13 @@ const EditableListView = ({ tasks, onUpdate, currency, groupBy, showCriticalPath
             });
 
             Object.keys(groups).sort().forEach(key => {
-                // Add Header Row
                 result.push({ 
                     id: `header-${key}`, 
                     name: key, 
                     isHeader: true, 
                     count: groups[key].length,
-                    // Pseudo fields to prevent render errors
                     start: '', end: '', resource: '', cost: 0, progress: 0, dependencies: []
                 });
-                // Add Items
                 groups[key].forEach(t => result.push({ ...t, isHeader: false, depth: 1 }));
             });
             
@@ -620,7 +580,6 @@ const EditableListView = ({ tasks, onUpdate, currency, groupBy, showCriticalPath
                                     type: "number",
                                     value: task.cost || 0,
                                     onChange: (e) => onUpdate(task.id, 'cost', parseFloat(e.target.value)),
-                                    // Disable cost editing for WBS/Summary items as they are calculated rollups
                                     disabled: task.type === 'project' || task.id === 'ROOT-SUMMARY',
                                     className: `bg-transparent w-24 outline-none print:text-black ${task.type === 'project' ? 'opacity-50 cursor-not-allowed font-semibold text-white' : 'text-slate-200'}`
                                 })
@@ -631,7 +590,6 @@ const EditableListView = ({ tasks, onUpdate, currency, groupBy, showCriticalPath
                                         type: 'range', min: 0, max: 100,
                                         value: task.progress,
                                         onChange: (e) => onUpdate(task.id, 'progress', parseInt(e.target.value)),
-                                        // Disable progress editing for WBS/Summary items
                                         disabled: task.type === 'project' || task.id === 'ROOT-SUMMARY',
                                         className: `w-16 h-1.5 bg-dark-bg rounded-lg appearance-none cursor-pointer accent-brand-purple ${task.type === 'project' ? 'opacity-50 cursor-not-allowed' : ''}`
                                     }),
@@ -655,11 +613,6 @@ const EditableListView = ({ tasks, onUpdate, currency, groupBy, showCriticalPath
 };
 
 const ScheduleMatrixView = ({ tasks }) => {
-    // Determine Project Start Date for relative calculation if needed, 
-    // but tasks already have absolute dates. We just use them directly.
-    // However, CPM (ES/EF/LS/LF) are usually relative integers in schedulingService.
-    // We need to convert them to dates relative to project start.
-    
     const projectStartDate = useMemo(() => {
         if (!tasks.length) return new Date();
         const startDates = tasks.map(t => new Date(t.start).getTime()).filter(d => !isNaN(d));
@@ -667,12 +620,11 @@ const ScheduleMatrixView = ({ tasks }) => {
     }, [tasks]);
 
     const toDate = (relativeDays) => {
-        // If relativeDays is undefined/null, return '-'
         if (relativeDays === undefined || relativeDays === null) return '-';
         return formatDate(addDays(projectStartDate, relativeDays));
     };
 
-    const flatTasks = tasks.filter(t => t.id !== 'ROOT-SUMMARY'); // Exclude root summary for cleaner matrix
+    const flatTasks = tasks.filter(t => t.id !== 'ROOT-SUMMARY'); 
 
     return React.createElement('div', { className: 'h-full overflow-auto bg-dark-card rounded-xl border border-dark-border print:bg-white print:border-gray-300' },
         React.createElement('table', { className: 'w-full text-left text-xs' },
@@ -718,15 +670,15 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
     const fullscreenRef = useRef(null);
     
     const [viewMode, setViewMode] = useState('timeline');
-    const [groupBy, setGroupBy] = useState('wbs'); // Used for List View
-    const [sortMode, setSortMode] = useState('wbs'); // New for Timeline View (wbs, date, resource)
+    const [groupBy, setGroupBy] = useState('wbs'); 
+    const [sortMode, setSortMode] = useState('wbs'); 
     const [scale, setScale] = useState('days');
     const [zoom, setZoom] = useState(1);
     const [isEditing, setIsEditing] = useState(false);
     const [expanded, setExpanded] = useState(new Set());
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showCriticalPath, setShowCriticalPath] = useState(false);
-    const [isOptimizeOpen, setIsOptimizeOpen] = useState(false); // Changed to controlled state
+    const [isOptimizeOpen, setIsOptimizeOpen] = useState(false); 
 
     const generate = async () => {
         try {
@@ -734,7 +686,6 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
             setError(null);
             const schedule = await generateScheduleFromPlan(projectData.plan, projectData.criteria);
             onUpdateProject({ schedule });
-            // Expand Root and Top Level Phases by default
             const expandedIds = schedule.filter(t => t.type === 'project' || t.level < 2).map(t => t.id);
             setExpanded(new Set(expandedIds));
         } catch (err) {
@@ -745,40 +696,32 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
     };
 
     useEffect(() => {
-        if (projectData.plan && !projectData.schedule && !isLoading) {
+        // Breaking the loop: Only trigger if plan is ready, no schedule exists, we aren't already loading, AND no error present.
+        if (projectData.plan && !projectData.schedule && !isLoading && !error) {
             generate();
         } else if (projectData.schedule && expanded.size === 0) {
              const expandedIds = projectData.schedule.filter(t => t.type === 'project' || (t.level && t.level < 2)).map(t => t.id);
              setExpanded(new Set(expandedIds));
         }
-    }, [projectData.plan, projectData.schedule, projectData.criteria, isLoading]);
+    }, [projectData.plan, projectData.schedule, projectData.criteria, isLoading, error]); // Added error to dependencies
 
     const handleUpdateTask = (id, field, value) => {
         const currentSchedule = projectData.schedule || [];
-        // 1. Update the specific task in the array
         const updatedTaskArray = currentSchedule.map(t => 
             t.id === id ? { ...t, [field]: value } : t
         );
-        
-        // 2. Recalculate Rollups (Bottom-Up) for Cost and Progress
-        // This ensures WBS parent items reflect the changes immediately
         const recalculatedSchedule = recalculateScheduleHierarchy(updatedTaskArray);
-
         onUpdateProject({ schedule: recalculatedSchedule });
     };
 
     const handleOptimize = (action) => {
         if (!projectData.schedule) return;
-        
-        // Add visual loading state so user knows something is happening
         setIsLoading(true);
-        
-        // Small timeout to allow UI render of loading state
         setTimeout(() => {
             const optimizedSchedule = applyCorrectiveAction(projectData.schedule, action);
             onUpdateProject({ schedule: optimizedSchedule });
-            setIsOptimizeOpen(false); // Close dropdown
-            setShowCriticalPath(true); // Show critical path so user sees changes
+            setIsOptimizeOpen(false); 
+            setShowCriticalPath(true); 
             setIsLoading(false);
         }, 100);
     };
@@ -791,7 +734,6 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
     };
 
     const handleCollapseAll = () => {
-        // Keep Root expanded, collapse others
         const root = projectData.schedule.find(t => t.id === 'ROOT-SUMMARY');
         setExpanded(new Set(root ? [root.id] : []));
     };
@@ -864,8 +806,6 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                 className: 'p-2 rounded-md text-brand-text-light hover:bg-white/10 hover:text-white transition-colors flex-shrink-0',
                 title: "Regenerate Schedule"
             }, React.createElement(RefreshIcon, { className: "h-5 w-5" })),
-            
-            // View Mode Switcher
             React.createElement('div', { className: 'flex bg-dark-card-solid rounded-lg p-1 border border-dark-border flex-shrink-0' },
                 [
                     { id: 'timeline', label: 'Timeline', icon: TimelineIcon },
@@ -880,8 +820,6 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                     }, React.createElement(mode.icon, { className: 'w-3 h-3' }), mode.label)
                 )
             ),
-
-            // Timeline Sorting (Only visible in Timeline)
             viewMode === 'timeline' && React.createElement('div', { className: 'flex items-center gap-2 ml-2 bg-dark-card-solid border border-dark-border rounded-lg px-2 py-1 flex-shrink-0' },
                 React.createElement('span', { className: 'text-xs text-brand-text-light' }, "Sort By:"),
                 React.createElement('select', {
@@ -894,8 +832,6 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                     React.createElement('option', { value: 'resource' }, "Resource")
                 )
             ),
-
-            // Group By Control (Only Visible in List Mode)
             viewMode === 'list' && React.createElement('div', { className: 'flex items-center gap-2 ml-2 bg-dark-card-solid border border-dark-border rounded-lg px-2 py-1 flex-shrink-0' },
                 React.createElement('span', { className: 'text-xs text-brand-text-light' }, "Group By:"),
                 React.createElement('select', {
@@ -912,18 +848,10 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
     );
 
     return React.createElement('div', { ref: fullscreenRef, className: "h-full flex flex-col text-white bg-dark-card printable-container" },
-        // --- Custom Header Implementation ---
         React.createElement('div', { className: 'non-printable flex-shrink-0 border-b border-dark-border bg-dark-card/50 px-4 h-16 flex items-center justify-between gap-4 overflow-x-auto scrollbar-hide' },
-             // Left: Title
              React.createElement('h2', { className: 'text-lg font-bold text-white mr-4 flex-shrink-0' }, t.dashboardScheduling),
-             
-             // Center: Custom Controls (Modes & Refresh)
              customControls,
-             
-             // Right: Tools
              React.createElement('div', { className: 'flex items-center gap-2 flex-shrink-0' },
-                
-                // Critical Path Toggle
                 React.createElement('button', {
                     onClick: () => setShowCriticalPath(!showCriticalPath),
                     className: `flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold border transition-colors flex-shrink-0 ${showCriticalPath ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-dark-card border-dark-border text-brand-text-light hover:bg-white/5'}`
@@ -931,8 +859,6 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                     React.createElement(StructureIcon, { className: "w-3 h-3" }),
                     "Critical Path"
                 ),
-
-                // Corrective Actions Dropdown (Click based)
                 React.createElement('div', { className: 'relative' },
                     React.createElement('button', { 
                         onClick: () => setIsOptimizeOpen(!isOptimizeOpen),
@@ -955,12 +881,10 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                         )
                     )
                 ),
-
                 viewMode === 'timeline' && React.createElement(React.Fragment, null,
                     React.createElement('div', { className: 'w-px h-6 bg-dark-border mx-1 flex-shrink-0' }),
                     React.createElement(IconButton, { icon: React.createElement(ZoomOutIcon), onClick: () => setZoom(z => Math.max(z - 0.2, 0.5)), tooltip: "Zoom Out" }),
                     React.createElement(IconButton, { icon: React.createElement(ZoomInIcon), onClick: () => setZoom(z => Math.min(z + 0.2, 2)), tooltip: "Zoom In" }),
-                    
                     React.createElement('div', { className: 'flex bg-dark-card-solid rounded-lg p-1 border border-dark-border mx-2 flex-shrink-0' },
                         [
                             { id: 'days', label: 'D' },
@@ -973,11 +897,9 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                             className: `w-8 h-7 flex items-center justify-center text-xs font-bold rounded-md transition-colors ${scale === option.id ? 'bg-dark-bg text-white border border-dark-border' : 'text-brand-text-light hover:bg-white/5'}`
                         }, option.label))
                     ),
-
                     React.createElement(IconButton, { icon: React.createElement(ExpandIcon), onClick: handleExpandAll, tooltip: "Expand All" }),
                     React.createElement(IconButton, { icon: React.createElement(CollapseIcon), onClick: handleCollapseAll, tooltip: "Collapse All" }),
                 ),
-                
                 React.createElement('div', { className: 'w-px h-6 bg-dark-border mx-1 flex-shrink-0' }),
                 React.createElement(IconButton, { 
                     icon: React.createElement(EditIcon), 
@@ -993,8 +915,6 @@ const SchedulingView = ({ language, projectData, onUpdateProject, isLoading, set
                 React.createElement(IconButton, { icon: React.createElement(ExportIcon), onClick: () => window.print(), tooltip: "Export" })
              )
         ),
-        
-        // --- Content Area ---
         React.createElement('div', { className: 'flex-grow min-h-0 overflow-hidden' },
             React.createElement('div', { className: 'p-0 h-full printable-content' },
                 renderContent()

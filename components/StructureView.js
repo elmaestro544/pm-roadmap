@@ -18,7 +18,7 @@ const InputView = ({ onGenerate, objective, setObjective, isLoading, error }) =>
              React.createElement('textarea', {
                 value: objective,
                 onChange: e => setObjective(e.target.value),
-                placeholder: 'e.g., Build a cross-platform mobile application for a local library system that includes user authentication, a searchable book catalog with real-time availability, and a feature for reserving books.',
+                placeholder: 'e.g., Build a cross-platform mobile application for a local library system...',
                 rows: 4,
                 className: 'w-full p-4 bg-dark-card-solid border border-dark-border rounded-lg focus:ring-2 focus:ring-brand-purple focus:outline-none resize-none text-white',
                 disabled: isLoading,
@@ -59,9 +59,6 @@ const ProjectTree = ({ node, layout }) => {
         if (layout !== 'optimized') {
             return '';
         }
-    
-        // In optimized mode, Project's children (Phases) are laid out side-by-side (horizontally).
-        // All other children (Modules, Components) are stacked (vertically).
         if (node.type === 'Project') {
             return 'layout-section-horizontal';
         } else {
@@ -88,7 +85,7 @@ const ProjectTree = ({ node, layout }) => {
 
 
 const ResultsView = ({ data, onReset }) => {
-    const [layout, setLayout] = useState('optimized'); // 'vertical', 'horizontal', or 'optimized'
+    const [layout, setLayout] = useState('optimized'); 
     
     return React.createElement('div', { className: 'w-full h-full flex flex-col items-start animate-fade-in-up' },
          React.createElement('div', { className: 'w-full flex justify-between items-center mb-8' },
@@ -112,48 +109,12 @@ const ResultsView = ({ data, onReset }) => {
         React.createElement('style', {
             dangerouslySetInnerHTML: {
                 __html: `
-                    .tree-container {
-                        width: 100%;
-                        overflow: auto;
-                        padding: 2rem;
-                        background-color: rgba(13, 12, 19, 0.5);
-                        border-radius: 12px;
-                        border: 1px solid rgba(45, 212, 191, 0.1);
-                    }
-                    .tree {
-                        display: inline-flex;
-                        min-width: 100%;
-                    }
-                    .tree, .tree ul, .tree li {
-                        position: relative;
-                    }
-                    .tree ul {
-                        display: flex;
-                    }
-                    .tree li {
-                        list-style: none;
-                        display: flex;
-                    }
-
-                    /* --- Node Styling --- */
-                    .node-content {
-                        border: 1px solid rgba(45, 212, 191, 0.2);
-                        padding: 12px 20px;
-                        background: #14121E;
-                        border-radius: 8px;
-                        display: flex;
-                        flex-direction: column;
-                        align-items: flex-start;
-                        gap: 8px;
-                        min-width: 220px;
-                        text-align: left;
-                        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-                        position: relative;
-                        z-index: 1;
-                        white-space: normal;
-                    }
-                    
-                    /* --- Vertical Layout (children are side-by-side) --- */
+                    .tree-container { width: 100%; overflow: auto; padding: 2rem; background-color: rgba(13, 12, 19, 0.5); border-radius: 12px; border: 1px solid rgba(45, 212, 191, 0.1); }
+                    .tree { display: inline-flex; min-width: 100%; }
+                    .tree, .tree ul, .tree li { position: relative; }
+                    .tree ul { display: flex; }
+                    .tree li { list-style: none; display: flex; }
+                    .node-content { border: 1px solid rgba(45, 212, 191, 0.2); padding: 12px 20px; background: #14121E; border-radius: 8px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 220px; text-align: left; box-shadow: 0 4px 15px rgba(0,0,0,0.3); position: relative; z-index: 1; white-space: normal; }
                     .tree-vertical { flex-direction: column; align-items: center; }
                     .tree-vertical ul { flex-direction: row; padding-top: 40px; }
                     .tree-vertical li { flex-direction: column; align-items: center; flex-grow: 1; padding: 0 10px; }
@@ -164,8 +125,6 @@ const ResultsView = ({ data, onReset }) => {
                     .tree-vertical > li::before, .tree-vertical > li::after { display: none; }
                     .tree-vertical li > .node-content::after { content: ''; position: absolute; top: 100%; left: 50%; width: 2px; height: 40px; background-color: #374151; transform: translateX(-50%); }
                     .tree-vertical li:not(:has(> ul)) > .node-content::after { display: none; }
-
-                    /* --- Horizontal Layout (children are stacked) --- */
                     .tree-horizontal { flex-direction: row; align-items: flex-start; }
                     .tree-horizontal ul { flex-direction: column; padding-left: 40px; justify-content: center; }
                     .tree-horizontal li { flex-direction: row; align-items: center; padding: 10px 0; }
@@ -177,22 +136,16 @@ const ResultsView = ({ data, onReset }) => {
                     .tree-horizontal ul li:first-child::after { content: ''; position: absolute; top: 0; left: 20px; height: 50%; width: 2px; background-color: #14121E; z-index: 0; }
                     .tree-horizontal ul li:last-child::after { content: ''; position: absolute; top: 50%; left: 20px; height: 50%; width: 2px; background-color: #14121E; z-index: 0; }
                     .tree-horizontal ul li:only-child::after { display: none; }
-
-                    /* --- Optimized Layout Specifics --- */
                     .tree-optimized { flex-direction: column; align-items: center; }
                     .tree-optimized > li { flex-direction: column; align-items: center; }
                     .tree-optimized > li > .node-content::after { content: ''; position: absolute; top: 100%; left: 50%; width: 2px; height: 40px; background-color: #374151; transform: translateX(-50%); }
                     .tree-optimized > li:not(:has(> ul)) > .node-content::after { display: none; }
-
-                    /* This section should lay out its children HORIZONTALLY (side-by-side) -> Vertical Tree Style */
                     .tree-optimized .layout-section-horizontal { flex-direction: row; padding-top: 40px; }
                     .tree-optimized .layout-section-horizontal > li { flex-direction: column; align-items: center; flex-grow: 1; padding: 0 10px; }
                     .tree-optimized .layout-section-horizontal > li:not(:only-child)::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px; background-color: #374151; }
                     .tree-optimized .layout-section-horizontal > li:first-child::before { left: 50%; width: 50%; }
                     .tree-optimized .layout-section-horizontal > li:last-child::before { width: 50%; }
                     .tree-optimized .layout-section-horizontal > li::after { content: ''; position: absolute; top: 0; left: 50%; width: 2px; height: 40px; background-color: #374151; transform: translateX(-50%); }
-
-                    /* This section should lay out its children VERTICALLY (stacked) -> Horizontal Tree Style */
                     .tree-optimized .layout-section-vertical { flex-direction: column; padding-left: 40px; justify-content: center; }
                     .tree-optimized .layout-section-vertical > li { flex-direction: row; align-items: center; padding: 10px 0; }
                     .tree-optimized .layout-section-vertical::before { content: ''; position: absolute; top: 0; left: 20px; width: 2px; height: 100%; background-color: #374151; }
@@ -219,7 +172,6 @@ const StructureView = ({ language, projectData, onUpdateProject, isLoading, setI
     const contentRef = useRef(null);
     const [objective, setObjective] = useState('');
 
-    // Toolbar state and handlers
     const [zoomLevel, setZoomLevel] = useState(1);
     const [isEditing, setIsEditing] = useState(false);
 
@@ -228,9 +180,9 @@ const StructureView = ({ language, projectData, onUpdateProject, isLoading, setI
     const handleToggleEdit = () => setIsEditing(prev => !prev);
     const handleExport = () => window.print();
 
-    // Auto-generate if project objective exists but structure is missing
     useEffect(() => {
-        if (projectData.objective && !projectData.structure && !isLoading) {
+        // Breaking the loop: Only trigger if we have an objective, no structure, aren't already loading, AND no error present.
+        if (projectData.objective && !projectData.structure && !isLoading && !error) {
              const generate = async () => {
                 try {
                     setIsLoading(true);
@@ -245,7 +197,7 @@ const StructureView = ({ language, projectData, onUpdateProject, isLoading, setI
             };
             generate();
         }
-    }, [projectData.objective, projectData.structure, isLoading, onUpdateProject, setIsLoading, setError]);
+    }, [projectData.objective, projectData.structure, isLoading, error]); // Added error to dependencies
 
     const handleGenerate = async () => {
         if (!objective.trim()) return;
@@ -253,7 +205,6 @@ const StructureView = ({ language, projectData, onUpdateProject, isLoading, setI
         setError(null);
         try {
             const data = await generateProjectStructure(objective);
-            // Save both structure and the manual objective to global state
             onUpdateProject({ structure: data, objective: objective }); 
         } catch (err) {
             setError(err.message || 'An unexpected error occurred.');
